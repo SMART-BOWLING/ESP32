@@ -1,0 +1,273 @@
+// BB
+
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <WiFi.h>
+#include <GyverButton.h>
+#include "time.h"
+
+// ===================== НАСТРОЙКИ =====================
+#define SENSOR_PIN        4    // Пин датчика
+#define BUTTON_PIN       22    // Пин кнопки
+
+// ===================== ПАРАМЕТРЫ ДЛЯ ДАТЧИКА =====================
+String sensorSheetName = "PS1";
+
+// ===================== ПАРАМЕТРЫ ДЛЯ КНОПКИ =====================
+String buttonColumn = "F";
+
+// ============== URLs для Google Apps Script ==============
+const char* sensorGoogleScriptURL = "https://script.google.com/macros/s/AKfycbxPvf-9VnmmevHcBUj7Jz1rV91NhkJ1nsLuPzvdDeSLRZXqKuVP-FG8mSj_FHJE6bh7nw/exec";
+const char* buttonGoogleScriptURL = "https://script.google.com/macros/s/AKfycbxrFUVr7p5mxbz3Uhii6wXJMyk26QrNHPi0uVnpLM63298BnarMCr-fR2_9w8JEURxI/exec";
+
+// ===================== Wi-Fi настройки =====================
+#define WIFI_SSID    "SMB000"
+#define WIFI_PASS   "SMB22222"
+const unsigned long wifiTimeout         = 30000;
+const unsigned long debounceDelaySensor = 50;
+
+// ===================== ПИНЫ СВЕТОДИОДОВ =====================
+const int ledRedPin    = 5;   // Красный
+const int ledGreenPin  = 17;  // Зелёный (Wi-Fi OK)
+const int ledBluePin   = 16;  // Синий (датчик)
+
+// ===================== ФЛАГИ СОБЫТИЙ =====================
+bool buttonEventActive     = false;
+unsigned long buttonEventStart = 0;
+
+bool sensorEventActive     = false;
+unsigned long sensorEventStart = 0;
+
+// ===================== ПЕРЕМЕННЫЕ ДАТЧИКА =====================
+GButton button(BUTTON_PIN);
+unsigned long lastDebounceTimeSensor = 0;
+int sensorState     = HIGH;
+int sensorPrevState = HIGH;
+int sensorTriggerCount = 0;
+unsigned long lastMinute      = 0;
+
+// ===================== ТАЙМЕР ДЛЯ LED =====================
+#define EVENT_DURATION 3000  // длительность индикации (мс)
+
+// ===================== SETUP =====================
+void setup() {
+  Serial.begin(115200);
+
+  // Задаём имя хоста для ESP32, чтобы оно отображалось в роутере
+  WiFi.setHostname("ESP32-PS1");
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.println("Подключение к Wi-Fi...");
+
+  // Кнопка
+  button.setTickMode(AUTO);
+  button.setTimeout(3000);
+
+  // Датчик
+  pinMode(SENSOR_PIN, INPUT_PULLUP);
+  sensorPrevState = digitalRead(SENSOR_PIN);
+
+  // LED
+  pinMode(ledRedPin,   OUTPUT);
+  pinMode(ledGreenPin, OUTPUT);
+  pinMode(ledBluePin,  OUTPUT);
+  setLED(false, false, false);
+
+  // NTP (Kyiv)
+  #define TZ_EUROPE_KYIV "EET-2EEST,M3.5.0/3,M10.5.0/4"
+  configTzTime(TZ_EUROPE_KYIV, "pool.ntp.org", "time.nist.gov");
+  Serial.println("Ожидание синхронизации времени...");
+  while (time(nullptr) < 100000) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nВремя синхронизировано");
+  printCurrentTimezone();
+
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+  lastMinute = timeinfo.tm_min;
+}
+
+// ===================== LOOP =====================
+void loop() {
+  button.tick();
+  checkButton();
+  checkSensor();
+  checkWiFiConnection();
+  handleLedIndication();
+  handleMinuteChange();
+}
+
+// ===================== УТИЛИТА ДЛЯ LED =====================
+void setLED(bool red, bool green, bool blue) {
+  digitalWrite(ledRedPin,   red   ? HIGH : LOW);
+  digitalWrite(ledGreenPin, green ? HIGH : LOW);
+  digitalWrite(ledBluePin,  blue  ? HIGH : LOW);
+}
+
+// ===================== ОБРАБОТКА КНОПКИ =====================
+void checkButton() {
+  if (button.isClick()) {
+    sendButtonData();
+    buttonEventActive = true;
+    buttonEventStart  = millis();
+  }
+  if (button.isHolded()) {
+    Serial.println("Перезагрузка ESP32...");
+    ESP.restart();
+  }
+}
+
+// ===================== ОБРАБОТКА ДАТЧИКА =====================
+void checkSensor() {
+  int reading = digitalRead(SENSOR_PIN);
+  if (reading != sensorPrevState) {
+    lastDebounceTimeSensor = millis();
+    sensorPrevState = reading;
+  }
+  if ((millis() - lastDebounceTimeSensor > debounceDelaySensor) && (reading != sensorState)) {
+    sensorState = reading;
+    if (sensorState == LOW) {
+      sensorTriggerCount++;
+      Serial.println("Sensor triggered, count=" + String(sensorTriggerCount));
+      sensorEventActive = true;
+      sensorEventStart  = millis();
+    }
+  }
+}
+
+// ===================== ОБРАБОТКА И ОТПРАВКА КАЖДУЮ МИНУТУ =====================
+void handleMinuteChange() {
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+  if (timeinfo.tm_min != lastMinute) {
+    // отправляем всегда, даже если count == 0
+    sendSensorBatchData(sensorTriggerCount, timeinfo);
+    sensorTriggerCount = 0;
+    lastMinute = timeinfo.tm_min;
+  }
+}
+
+// ===================== ОТПРАВКА ДАННЫХ ДАТЧИКА =====================
+void sendSensorBatchData(int count, struct tm timeinfo) {
+  // корректируем время на минуту назад
+  timeinfo.tm_min--;
+  if (timeinfo.tm_min < 0) {
+    timeinfo.tm_min = 59;
+    timeinfo.tm_hour--;
+  }
+  if (timeinfo.tm_hour < 0) {
+    timeinfo.tm_hour = 23;
+    timeinfo.tm_mday--;
+  }
+  char timeStr[20];
+  strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:00", &timeinfo);
+  String url = String(sensorGoogleScriptURL)
+             + "?sheet=" + urlencode(sensorSheetName)
+             + "&count=" + String(count)
+             + "&time=" + urlencode(String(timeStr));
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http;
+  if (WiFi.status() == WL_CONNECTED) {
+    http.begin(client, url);
+    int code = http.GET();
+    Serial.printf("SensorBatch sent, code=%d, time=%s\n", code, timeStr);
+    http.end();
+  }
+}
+
+// ===================== ОТПРАВКА ДАННЫХ КНОПКИ =====================
+void sendButtonData() {
+  String url = String(buttonGoogleScriptURL) + "?column=" + urlencode(buttonColumn);
+  WiFiClientSecure client; client.setInsecure();
+  HTTPClient http;
+  if (WiFi.status() == WL_CONNECTED) {
+    http.begin(client, url);
+    int code = http.GET();
+    Serial.printf("ButtonData sent, code=%d\n", code);
+    http.end();
+  }
+}
+
+// ===================== АВТО-ПЕРЕПОДКЛЮЧЕНИЕ Wi-Fi =====================
+void checkWiFiConnection() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Wi-Fi отключён, переподключаемся...");
+    WiFi.disconnect();
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    unsigned long start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < wifiTimeout) {
+      delay(500);
+      Serial.print(".");
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\nWi-Fi восстановлен!");
+    } else {
+      Serial.println("\nНе удалось подключиться к Wi-Fi");
+    }
+  }
+}
+
+// ===================== УПРАВЛЕНИЕ ИНДИКАЦИЕЙ =====================
+void handleLedIndication() {
+  // 1) Приоритет — кнопка
+  if (buttonEventActive) {
+    if (millis() - buttonEventStart < EVENT_DURATION) {
+      setLED(true, false, false); // красный
+      return;
+    } else {
+      buttonEventActive = false;
+    }
+  }
+  // 2) Далее — датчик
+  if (sensorEventActive) {
+    if (millis() - sensorEventStart < EVENT_DURATION) {
+      setLED(false, false, true); // синий
+      return;
+    } else {
+      sensorEventActive = false;
+    }
+  }
+  // 3) Индикация Wi-Fi
+  static bool blink = false;
+  static unsigned long lastBlink = 0;
+  if (WiFi.status() != WL_CONNECTED) {
+    if (millis() - lastBlink >= 500) {
+      blink = !blink;
+      lastBlink = millis();
+    }
+    setLED(blink, false, false); // мигающий красный
+  } else {
+    setLED(false, true, false);   // зелёный
+  }
+}
+
+// ===================== ВЫВОД ЧАСОВОГО ПОЯСА =====================
+void printCurrentTimezone() {
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+  char tz[10];
+  strftime(tz, sizeof(tz), "%Z", &timeinfo);
+  Serial.printf("Текущий часовой пояс: %s\n", tz);
+}
+
+// ===================== URLENCODE =====================
+String urlencode(const String &str) {
+  String encoded;
+  char c, code0, code1;
+  for (int i = 0; i < str.length(); i++) {
+    c = str.charAt(i);
+    if (isalnum(c)) {
+      encoded += c;
+    } else {
+      code1 = (c & 0xF) + '0';
+      if ((c & 0xF) > 9) code1 = (c & 0xF) - 10 + 'A';
+      code0 = ((c >> 4) & 0xF) + '0';
+      if (((c >> 4) & 0xF) > 9) code0 = ((c >> 4) & 0xF) - 10 + 'A';
+      encoded += '%';
+      encoded += code0;
+      encoded += code1;
+    }
+  }
+  return encoded;
+}
