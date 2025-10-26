@@ -1,0 +1,215 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// ===================== НАСТРОЙКИ =====================
+#define PIN_D  2
+#define PIN_H  4  
+#define PIN_L  5
+#define PIN_P  25
+#define PIN_T  26
+#define PIN_X  27
+#define PIN_AB 32
+#define PIN_AF 33
+#define PIN_AJ 17
+#define PIN_AN 16
+#define PIN_AR 19
+#define PIN_AV 21
+#define PIN_AZ 22
+#define PIN_BD 23
+
+// RGB светодиод
+#define LED_RED    
+#define LED_GREEN    
+#define LED_BLUE   18
+
+#define WIFI_SSID "TP-Link_515A"
+#define WIFI_PASS "21857638"
+
+const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbw7-eG1uLTHRkSniKY7NvAE4Tan9bBGE_ToRCwqFujPBX5SvUx4a_A9hF3XqlbXkhsL/exec";
+
+struct PinConfig {
+  uint8_t pin;
+  const char* column;
+  bool lastState;
+};
+
+PinConfig pinConfigs[] = {
+  {PIN_D,  "D",  HIGH},
+  {PIN_H,  "H",  HIGH},
+  {PIN_L,  "L",  HIGH},
+  {PIN_P,  "P",  HIGH},
+  {PIN_T,  "T",  HIGH},
+  {PIN_X,  "X",  HIGH},
+  {PIN_AB, "AB", HIGH},
+  {PIN_AF, "AF", HIGH},
+  {PIN_AJ, "AJ", HIGH},
+  {PIN_AN, "AN", HIGH},
+  {PIN_AR, "AR", HIGH},
+  {PIN_AV, "AV", HIGH},
+  {PIN_AZ, "AZ", HIGH},
+  {PIN_BD, "BD", HIGH}
+};
+
+const int numPins = sizeof(pinConfigs) / sizeof(pinConfigs[0]);
+
+// Переменные состояния
+bool wifiConnected = false;
+unsigned long lastWifiCheck = 0;
+const unsigned long WIFI_CHECK_INTERVAL = 10000;
+
+void setup() {
+  Serial.begin(115200);
+  
+  // Настройка пинов кнопок
+  for (int i = 0; i < numPins; i++) {
+    pinMode(pinConfigs[i].pin, INPUT_PULLUP);
+    pinConfigs[i].lastState = digitalRead(pinConfigs[i].pin);
+  }
+  
+  // Настройка RGB светодиода
+  pinMode(LED_BLUE, OUTPUT);
+  
+  // Начальная индикация - КРАСНЫЙ (инициализация)
+  setLED(255, 0, 0);
+  Serial.println("Инициализация системы...");
+  delay(1000);
+  
+  // Подключение к Wi-Fi
+  connectToWiFi();
+}
+
+void loop() {
+  // Периодическая проверка Wi-Fi
+  if (millis() - lastWifiCheck > WIFI_CHECK_INTERVAL) {
+    checkWiFiConnection();
+    lastWifiCheck = millis();
+  }
+  
+  // Обработка кнопок
+  checkButtons();
+  
+  delay(10);
+}
+
+void connectToWiFi() {
+  Serial.println("Подключение к Wi-Fi...");
+  setLED(0, 0, 255); // СИНИЙ - подключение
+  
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+    Serial.println("\nПодключено к Wi-Fi!");
+    Serial.print("IP адрес: ");
+    Serial.println(WiFi.localIP());
+    
+    // ЗЕЛЕНЫЙ - успех на 1 секунду, затем выключить
+    setLED(0, 255, 0);
+    delay(1000);
+    setLED(0, 0, 0); // ВЫКЛЮЧЕН - готовность
+    
+  } else {
+    wifiConnected = false;
+    Serial.println("\nОшибка подключения к Wi-Fi!");
+    setLED(255, 0, 0); // КРАСНЫЙ - ошибка
+  }
+}
+
+void checkWiFiConnection() {
+  if (WiFi.status() != WL_CONNECTED) {
+    wifiConnected = false;
+    Serial.println("Wi-Fi отключен! Переподключение...");
+    setLED(255, 0, 0); // КРАСНЫЙ - нет соединения
+    connectToWiFi();
+  } else if (!wifiConnected) {
+    wifiConnected = true;
+    Serial.println("Wi-Fi восстановлен!");
+    setLED(0, 255, 0); // ЗЕЛЕНЫЙ - успех
+    delay(1000);
+    setLED(0, 0, 0);   // ВЫКЛЮЧЕН - готовность
+  }
+}
+
+void checkButtons() {
+  for (int i = 0; i < numPins; i++) {
+    int currentState = digitalRead(pinConfigs[i].pin);
+    
+    if (currentState == LOW && pinConfigs[i].lastState == HIGH) {
+      delay(50); // антидребезг
+      if (digitalRead(pinConfigs[i].pin) == LOW) {
+        Serial.printf("Кнопка на пине %d нажата (Колонка %s)\n", 
+                     pinConfigs[i].pin, pinConfigs[i].column);
+        
+        // СИНИЙ - начало отправки
+        setLED(0, 0, 255);
+        
+        bool success = sendDataToGoogleSheet(pinConfigs[i].column);
+        
+        // Индикация результата
+        if (success) {
+          setLED(0, 255, 0); // ЗЕЛЕНЫЙ - успех
+          Serial.println("✓ Данные отправлены успешно");
+        } else {
+          setLED(255, 0, 0); // КРАСНЫЙ - ошибка
+          Serial.println("✗ Ошибка отправки данных");
+        }
+        
+        delay(500); // Показать статус 0.5 сек
+        setLED(0, 0, 0); // ВЫКЛЮЧЕН - возврат в ожидание
+        
+        // Ждем отпускания кнопки
+        while (digitalRead(pinConfigs[i].pin) == LOW) {
+          delay(10);
+        }
+      }
+    }
+    
+    pinConfigs[i].lastState = currentState;
+  }
+}
+
+bool sendDataToGoogleSheet(const char* column) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Нет подключения к Wi-Fi!");
+    return false;
+  }
+  
+  String url = String(googleScriptURL) + "?column=" + String(column);
+  
+  Serial.print("Отправка данных: ");
+  Serial.println(url);
+  
+  HTTPClient http;
+  bool success = false;
+  
+  http.begin(url);
+  http.setTimeout(10000);
+  
+  int httpCode = http.GET();
+  
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.printf("HTTP код: %d\n", httpCode);
+    Serial.printf("Ответ: %s\n", response.c_str());
+    
+    if (httpCode == 200) {
+      success = true;
+    }
+  } else {
+    Serial.printf("Ошибка HTTP: %s\n", http.errorToString(httpCode).c_str());
+  }
+  
+  http.end();
+  return success;
+}
+
+void setLED(int red, int green, int blue) {
+  analogWrite(LED_BLUE, blue);
+}
