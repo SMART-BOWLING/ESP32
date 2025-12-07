@@ -22,8 +22,8 @@
 #define LED_GREEN    
 #define LED_BLUE   18
 
-#define WIFI_SSID "TP-Link_515A"
-#define WIFI_PASS "21857638"
+#define WIFI_SSID "Bowling"
+#define WIFI_PASS "11110000"
 
 const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbw7-eG1uLTHRkSniKY7NvAE4Tan9bBGE_ToRCwqFujPBX5SvUx4a_A9hF3XqlbXkhsL/exec";
 
