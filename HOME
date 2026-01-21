@@ -9,7 +9,7 @@
 const unsigned long wifiTimeout = 30000;
 
 // ============== URL для Google Apps Script ==============
-const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbwCQv7kR0zGnogRxDSMwhEVGWO0uus68wNIm5iu5NpKyW33d8tpjGUBDEOYc8pFBKbj/exec";
+const char* googleScriptURL = "https://script.google.com/macros/s/AKfycbydGhdz9qUIuJkkdYrrY5i3NODRO0Capvrjud4Kp2jyiU3LI-1RzOGYQSZvTtlIQ8wl/exec";
 
 // ===================== ПИНЫ СВЕТОДИОДОВ =====================
 // ESP32-C3 SUPER MINI встроенные RGB LED пины:
@@ -26,6 +26,12 @@ unsigned long lastWiFiCheck = 0;
 bool errorBlinkActive = false;
 unsigned long lastErrorBlink = 0;
 bool errorLedState = false;
+unsigned long wifiConnectStartTime = 0;
+bool wifiConnecting = false;
+int wifiConnectionState = 0;
+unsigned long lastWiFiEvent = 0;
+unsigned long lastSerialDot = 0;
+int dotCount = 0;
 
 // ===================== НАСТРОЙКИ ДЛЯ ОТПРАВКИ =====================
 String sheetName = "HOME";
@@ -47,29 +53,19 @@ void setup() {
   digitalWrite(ledBluePin, LOW);
   digitalWrite(ledRedPin, LOW);
 
-  // Подключаемся к Wi-Fi
-  connectToWiFi();
+  // Запускаем подключение к Wi-Fi
+  startWiFiConnection();
 
-  // Настраиваем время (NTP) только если Wi-Fi подключен
-  if (wifiConnected) {
-    setupNTP();
-    
-    // Получаем текущее время
-    struct tm timeinfo;
-    getLocalTime(&timeinfo);
-    lastMinute = timeinfo.tm_min;
-    
-    Serial.println("Setup завершен");
-    printLocalTime();
-  } else {
-    Serial.println("Setup завершен (без NTP, нет Wi-Fi)");
-  }
+  Serial.println("Setup завершен");
 }
 
 // ===================== LOOP =====================
 void loop() {
-  // Проверяем подключение Wi-Fi
-  checkWiFiConnection();
+  // Управляем подключением к Wi-Fi (неблокирующее)
+  handleWiFiConnection();
+  
+  // Проверяем состояние Wi-Fi соединения
+  checkWiFiStatus();
   
   // Управляем светодиодами
   handleLeds();
@@ -82,8 +78,8 @@ void loop() {
   delay(100); // Небольшая задержка для стабильности
 }
 
-// ===================== ПОДКЛЮЧЕНИЕ К WI-FI =====================
-void connectToWiFi() {
+// ===================== ЗАПУСК ПОДКЛЮЧЕНИЯ К WI-FI =====================
+void startWiFiConnection() {
   Serial.println("\n==============================================");
   Serial.print("Подключение к Wi-Fi: ");
   Serial.println(WIFI_SSID);
@@ -92,25 +88,65 @@ void connectToWiFi() {
   // Задаём имя хоста для ESP32-C3
   WiFi.setHostname("ESP32-C3-MINUTE");
   
+  // Сбрасываем состояние подключения
+  wifiConnecting = true;
+  wifiConnectionState = 0;
+  wifiConnectStartTime = millis();
+  lastWiFiEvent = millis();
+  lastSerialDot = millis();
+  dotCount = 0;
+  
   // Показываем что пытаемся подключиться - мигаем красным
   errorBlinkActive = true;
+  errorLedState = true;
+  digitalWrite(ledRedPin, HIGH);
+  digitalWrite(ledBluePin, LOW);
   
+  // Начинаем подключение
   WiFi.begin(WIFI_SSID, WIFI_PASS);
+  Serial.print("Подключение");
+}
+
+// ===================== ОБРАБОТКА ПОДКЛЮЧЕНИЯ К WI-FI (НЕБЛОКИРУЮЩАЯ) =====================
+void handleWiFiConnection() {
+  if (!wifiConnecting) return;
   
-  unsigned long startAttemptTime = millis();
-  int dotCount = 0;
+  unsigned long currentTime = millis();
   
-  while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < wifiTimeout) {
-    delay(500);
-    Serial.print(".");
-    dotCount++;
-    if (dotCount % 40 == 0) Serial.println(); // Новая строка каждые 20 точек
+  // Проверяем таймаут
+  if (currentTime - wifiConnectStartTime >= wifiTimeout) {
+    // Таймаут истек
+    wifiConnecting = false;
+    wifiConnected = false;
+    errorBlinkActive = true;
+    
+    Serial.println("\n\n❌ ТАЙМАУТ ПОДКЛЮЧЕНИЯ К WI-FI!");
+    Serial.println("Причины:");
+    Serial.println("1. Неправильный SSID или пароль");
+    Serial.println("2. Роутер выключен или недоступен");
+    Serial.println("3. Слишком слабый сигнал");
+    Serial.println("4. Проблемы с Wi-Fi модулем ESP32");
+    Serial.println("==============================================\n");
+    return;
   }
   
-  if (WiFi.status() == WL_CONNECTED) {
+  // Печатаем точки каждые 500 мс
+  if (currentTime - lastSerialDot >= 500) {
+    lastSerialDot = currentTime;
+    Serial.print(".");
+    dotCount++;
+    if (dotCount % 40 == 0) Serial.println(); // Новая строка каждые 20 секунд
+  }
+  
+  // Проверяем состояние подключения
+  wl_status_t status = WiFi.status();
+  
+  if (status == WL_CONNECTED) {
+    // Подключение успешно
+    wifiConnecting = false;
     wifiConnected = true;
     errorBlinkActive = false;
-    digitalWrite(ledRedPin, LOW); // Выключаем красный
+    digitalWrite(ledRedPin, LOW);
     digitalWrite(ledBluePin, HIGH); // Включаем синий постоянно
     
     Serial.println("\n\n✅ Wi-Fi ПОДКЛЮЧЕН!");
@@ -119,23 +155,19 @@ void connectToWiFi() {
     Serial.print("📶 Сигнал RSSI: ");
     Serial.print(WiFi.RSSI());
     Serial.println(" dBm");
+    Serial.println("==============================================\n");
     
-  } else {
-    wifiConnected = false;
-    errorBlinkActive = true; // Продолжаем мигать красным при ошибке
+    // Настраиваем NTP после подключения
+    setupNTP();
     
-    Serial.println("\n\n❌ ОШИБКА ПОДКЛЮЧЕНИЯ К WI-FI!");
-    Serial.println("Причины:");
-    Serial.println("1. Неправильный SSID или пароль");
-    Serial.println("2. Роутер выключен или недоступен");
-    Serial.println("3. Слишком слабый сигнал");
-    Serial.println("4. Проблемы с Wi-Fi модулем ESP32");
-    
-    // Выключаем синий светодиод на всякий случай
-    digitalWrite(ledBluePin, LOW);
+    // Получаем текущее время
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 100)) {
+      lastMinute = timeinfo.tm_min;
+    }
   }
-  
-  Serial.println("==============================================\n");
+  // Если статус не CONNECTED, но и не IDLE, значит что-то происходит
+  // Просто продолжаем ждать в следующем цикле
 }
 
 // ===================== НАСТРОЙКА NTP =====================
@@ -146,18 +178,26 @@ void setupNTP() {
   Serial.println("⏰ Настройка NTP времени...");
   configTzTime(TZ_EUROPE_KYIV, "pool.ntp.org", "time.nist.gov");
   
+  unsigned long ntpStartTime = millis();
+  bool timeSynced = false;
+  
   Serial.print("🔄 Ожидание синхронизации времени");
-  for (int i = 0; i < 30; i++) { // 30 попыток по 100 мс
+  
+  // Неблокирующая проверка синхронизации времени
+  while (!timeSynced && (millis() - ntpStartTime < 5000)) { // Таймаут 5 секунд
     struct tm timeinfo;
     if (getLocalTime(&timeinfo, 100)) {
+      timeSynced = true;
       Serial.println("\n✅ Время синхронизировано!");
       printLocalTime();
       return;
     }
-    Serial.print(".");
     delay(100);
   }
-  Serial.println("\n⚠️ Предупреждение: Не удалось синхронизировать время!");
+  
+  if (!timeSynced) {
+    Serial.println("\n⚠️ Предупреждение: Не удалось синхронизировать время!");
+  }
 }
 
 // ===================== ОБРАБОТКА ИЗМЕНЕНИЯ МИНУТЫ =====================
@@ -264,7 +304,7 @@ void handleLeds() {
       // Завершили мигание
       sendingData = false;
       // Возвращаем синий в обычное состояние (горит при Wi-Fi)
-      if (wifiConnected) {
+      if (wifiConnected && !errorBlinkActive) {
         digitalWrite(ledBluePin, HIGH);
       }
     }
@@ -298,8 +338,10 @@ void handleLeds() {
   }
 }
 
-// ===================== ПРОВЕРКА ПОДКЛЮЧЕНИЯ WI-FI =====================
-void checkWiFiConnection() {
+// ===================== ПРОВЕРКА СОСТОЯНИЯ WI-FI =====================
+void checkWiFiStatus() {
+  if (wifiConnecting) return; // Не проверяем во время подключения
+  
   if (millis() - lastWiFiCheck >= 5000) { // Проверяем каждые 5 секунд
     lastWiFiCheck = millis();
     
@@ -307,6 +349,7 @@ void checkWiFiConnection() {
     
     if (currentStatus != wifiConnected) {
       if (currentStatus) {
+        // Wi-Fi восстановился
         wifiConnected = true;
         errorBlinkActive = false;
         digitalWrite(ledBluePin, HIGH);
@@ -322,15 +365,16 @@ void checkWiFiConnection() {
         }
         
       } else {
+        // Потеряно соединение
         wifiConnected = false;
         errorBlinkActive = true;
         digitalWrite(ledBluePin, LOW);
         
         Serial.println("\n❌ ПОТЕРЯНО ПОДКЛЮЧЕНИЕ WI-FI!");
-        Serial.println("Пытаюсь переподключиться...");
+        Serial.println("Попытка переподключения...");
         
-        // Пытаемся переподключиться
-        WiFi.reconnect();
+        // Запускаем переподключение
+        startWiFiConnection();
       }
     }
   }
