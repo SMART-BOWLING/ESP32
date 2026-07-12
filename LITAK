@@ -1,0 +1,89 @@
+#include <Joystick.h>
+
+// Джойстик: 10 кнопок, 4 оси
+Joystick_ Joystick(
+  JOYSTICK_DEFAULT_REPORT_ID,
+  JOYSTICK_TYPE_GAMEPAD,
+  10, // кнопки
+  0,  // hat
+  true,  // X
+  true,  // Y
+  true,  // Z
+  true,  // Rx
+  false, // Ry
+  false, // Rz
+  false, false, false, false, false
+);
+
+// Потенциометры
+const int potX  = A0;
+const int potY  = A1;
+const int potZ  = A2;
+const int potRx = A3;
+
+// Кнопки
+const int buttons[10] = {2,3,4,5,6,7,8,9,10,16}; // 16 = pin на Pro Micro
+
+// Калибровка
+int minVal[4] = {1023,1023,1023,1023};
+int maxVal[4] = {0,0,0,0};
+
+void setup() {
+  Serial.begin(9600);
+  Joystick.begin();
+
+  // Кнопки как INPUT_PULLUP
+  for (int i = 0; i < 10; i++) {
+    pinMode(buttons[i], INPUT_PULLUP);
+  }
+}
+
+void loop() {
+  int raw[4];
+
+  raw[0] = analogRead(potX);
+  raw[1] = analogRead(potY);
+  raw[2] = analogRead(potZ);
+  raw[3] = analogRead(potRx);
+
+  // авто-калибровка
+  for (int i = 0; i < 4; i++) {
+    if (raw[i] < minVal[i]) minVal[i] = raw[i];
+    if (raw[i] > maxVal[i]) maxVal[i] = raw[i];
+  }
+
+  // проверка диапазона
+  for (int i = 0; i < 4; i++) {
+    if ((maxVal[i] - minVal[i]) < 10) return;
+  }
+
+  int val[4];
+
+  for (int i = 0; i < 4; i++) {
+    val[i] = map(raw[i], minVal[i], maxVal[i], 0, 1023);
+    val[i] = constrain(val[i], 0, 1023);
+  }
+
+  // инверсия Y (как у тебя)
+  val[1] = 1023 - val[1];
+
+  // передаем оси
+  Joystick.setXAxis(val[0]);
+  Joystick.setYAxis(val[1]);
+  Joystick.setZAxis(val[2]);
+  Joystick.setRxAxis(val[3]);
+
+  // кнопки
+  for (int i = 0; i < 10; i++) {
+    bool pressed = !digitalRead(buttons[i]); // инверсия из-за INPUT_PULLUP
+    Joystick.setButton(i, pressed);
+  }
+
+  // отладка
+  Serial.print("X: "); Serial.print(val[0]);
+  Serial.print(" Y: "); Serial.print(val[1]);
+  Serial.print(" Z: "); Serial.print(val[2]);
+  Serial.print(" Rx: "); Serial.println(val[3]);
+
+  delay(20);
+}
