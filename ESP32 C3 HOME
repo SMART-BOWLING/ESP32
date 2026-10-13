@@ -1,0 +1,144 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <time.h>
+
+// ================= WIFI =================
+const char* ssid     = "TP-Link_515A";
+const char* password = "21857638";
+
+// ================= API =================
+const char* scriptUrl = "https://script.google.com/macros/s/AKfycbxzAgIbRQNPQjp_MqU6Sjpw-2dTK7OUJ9Ypt_w0LGe5lJZlJEksGIOONm4IWy-p7uizHQ/exec";
+
+// ================= ВРЕМЯ =================
+// POSIX-строка для Украины: EET (зимой UTC+2), EEST (летом UTC+3)
+const char* tzInfo    = "EET-2EEST,M3.5.0/3,M10.5.0/4";
+const char* ntpServer = "pool.ntp.org";
+
+// ================= СОСТОЯНИЕ =================
+long lastSentKey = -1;                    // уникальный ключ последней УСПЕШНО отправленной минуты
+unsigned long lastTry = 0;                // время последней попытки (millis)
+const unsigned long retryInterval = 15000; // 15 сек — ретрай, если пропустили 0-ю секунду
+
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  WiFi.begin(ssid, password);
+  Serial.print("Подключение к WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi подключён!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+
+  configTzTime(tzInfo, ntpServer);
+  Serial.println("Ожидание NTP...");
+
+  struct tm ti;
+  while (!getLocalTime(&ti)) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nВремя синхронизировано!");
+  printTime(ti);
+}
+
+// ================= LOOP =================
+void loop() {
+  struct tm ti;
+  if (!getLocalTime(&ti)) {
+    delay(1000);
+    return;
+  }
+
+  // Уникальный ключ текущей минуты
+  long curKey = ((long)(ti.tm_year) << 20)
+              | ((long)(ti.tm_mon)  << 16)
+              | ((long)(ti.tm_mday) << 11)
+              | ((long)(ti.tm_hour) <<  6)
+              |  (long)(ti.tm_min);
+
+  // Уже успешно отправили эту минуту? — выходим
+  if (curKey == lastSentKey) {
+    delay(200);
+    return;
+  }
+
+  bool needSend = false;
+
+  // 1) на 0-й секунде новой минуты
+  if (ti.tm_sec == 0) {
+    needSend = true;
+  }
+  // 2) ретрай, если давно не пытались (например, пропустили 0-ю секунду)
+  else if (millis() - lastTry > retryInterval) {
+    needSend = true;
+  }
+
+  if (needSend) {
+    lastTry = millis();
+    if (sendTimestamp(ti)) {
+      lastSentKey = curKey;   // фиксируем УСПЕШНУЮ отправку
+    }
+  }
+
+  delay(200);
+}
+
+// ================= ОТПРАВКА =================
+bool sendTimestamp(struct tm ti) {
+  char timeStr[24];
+  sprintf(timeStr, "%02d.%02d.%04d %d:%02d",
+          ti.tm_mday, ti.tm_mon + 1, ti.tm_year + 1900,
+          ti.tm_hour, ti.tm_min);
+
+  Serial.print("Отправка: ");
+  Serial.println(timeStr);
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi отключён, переподключение...");
+    WiFi.reconnect();
+    delay(2000);
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("Переподключение не удалось");
+      return false;
+    }
+  }
+
+  HTTPClient http;
+  http.begin(scriptUrl);
+  http.setTimeout(15000);
+  http.addHeader("Content-Type", "application/json");
+
+  String payload = "{\"timestamp\":\"" + String(timeStr) + "\"}";
+  int httpCode = http.POST(payload);
+
+  bool success = false;
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.print("HTTP ");
+    Serial.print(httpCode);
+    Serial.print(" | Ответ: ");
+    Serial.println(response);
+    if (httpCode == 200) success = true;
+  } else {
+    Serial.print("Ошибка HTTP: ");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+  return success;
+}
+
+// ================= ОТЛАДКА =================
+void printTime(struct tm ti) {
+  char buf[32];
+  sprintf(buf, "%02d.%02d.%04d %d:%02d:%02d",
+          ti.tm_mday, ti.tm_mon + 1, ti.tm_year + 1900,
+          ti.tm_hour, ti.tm_min, ti.tm_sec);
+  Serial.print("Текущее время: ");
+  Serial.println(buf);
+}
