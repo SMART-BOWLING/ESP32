@@ -1,0 +1,126 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <EEPROM.h>
+
+// ====== Wi-Fi (та же сеть, что и первый ESP) ======
+const char* ssid     = "TP-Link_515A";
+const char* password = "21857638";
+
+// ====== Пины Масветов ======
+#define PIN_COLD  D1   // холодный свет
+#define PIN_WARM  D2   // тёплый свет
+
+#define PWM_RANGE 1023
+
+ESP8266WebServer server(80);
+
+int coldPercent = 70;   // яркость (0..100)
+int warmPercent = 50;   // температура/тёплый (0..100)
+
+// ====== EEPROM адреса ======
+#define EE_COLD 0
+#define EE_WARM 1
+
+void applyCold(int percent) {
+  percent = constrain(percent, 0, 100);
+  coldPercent = percent;
+  int v = map(percent, 0, 100, 0, PWM_RANGE);
+  analogWrite(PIN_COLD, v);
+  Serial.printf("[COLD] %d%% -> %d\n", percent, v);
+}
+
+void applyWarm(int percent) {
+  percent = constrain(percent, 0, 100);
+  warmPercent = percent;
+  int v = map(percent, 0, 100, 0, PWM_RANGE);
+  analogWrite(PIN_WARM, v);
+  Serial.printf("[WARM] %d%% -> %d\n", percent, v);
+}
+
+void saveAll() {
+  EEPROM.write(EE_COLD, coldPercent);
+  EEPROM.write(EE_WARM, warmPercent);
+  EEPROM.commit();
+}
+
+void loadAll() {
+  int c = EEPROM.read(EE_COLD);
+  int w = EEPROM.read(EE_WARM);
+  if (c < 0 || c > 100) c = 70;
+  if (w < 0 || w > 100) w = 50;
+  applyCold(c);
+  applyWarm(w);
+}
+
+void sendCORS() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "*");
+  server.sendHeader("Cache-Control", "no-store");
+}
+
+void handleSet() {
+  sendCORS();
+  bool changed = false;
+
+  if (server.hasArg("val")) {
+    applyCold(server.arg("val").toInt());
+    changed = true;
+  }
+  if (server.hasArg("temp")) {
+    applyWarm(server.arg("temp").toInt());
+    changed = true;
+  }
+
+  if (changed) {
+    saveAll();
+    server.send(200, "text/plain", "OK");
+  } else {
+    server.send(400, "text/plain", "Missing val/temp");
+  }
+}
+
+void handleBattery() {
+  sendCORS();
+  int level = 87;   // заглушка
+  server.send(200, "application/json", "{\"level\":" + String(level) + "}");
+}
+
+void handleStatus() {
+  sendCORS();
+  String json = "{\"val\":" + String(coldPercent) +
+                ",\"temp\":" + String(warmPercent) + "}";
+  server.send(200, "application/json", json);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+  Serial.println("\n=== ESP #2 START (COLD+WARM) ===");
+
+  EEPROM.begin(512);
+  loadAll();
+
+  analogWriteRange(PWM_RANGE);
+  analogWriteFreq(1000);
+  pinMode(PIN_COLD, OUTPUT);
+  pinMode(PIN_WARM, OUTPUT);
+  analogWrite(PIN_COLD, map(coldPercent, 0, 100, 0, PWM_RANGE));
+  analogWrite(PIN_WARM, map(warmPercent, 0, 100, 0, PWM_RANGE));
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.print("[WiFi] Connecting");
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.printf("\n[WiFi] IP: %s\n", WiFi.localIP().toString().c_str());
+  Serial.println(">>> ОЖИДАЕМЫЙ IP: 192.168.1.107 <<<");
+
+  server.on("/set",     HTTP_GET, handleSet);
+  server.on("/battery", HTTP_GET, handleBattery);
+  server.on("/status",  HTTP_GET, handleStatus);
+  server.onNotFound([](){ sendCORS(); server.send(404, "text/plain", "Not Found"); });
+  server.begin();
+  Serial.println("[HTTP] Ready");
+}
+
+void loop() { server.handleClient(); }
