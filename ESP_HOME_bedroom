@@ -13,564 +13,57 @@ ESP8266WebServer server(80);
 int brightness = 70;
 int pwmValue   = 0;
 
-// ============================================================
-//  HTML ПУЛЬТА — только две карточки
-// ============================================================
-const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fbfaf6">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="СВЕТ ДОМ">
-<title>СВЕТ ДОМ</title>
-
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  --bg: #fbfaf6;
-  --text: #16181d;
-  --muted: #7a7d85;
-  --line: #e8e5dc;
-  --hair: #eeece5;
-  --panel: rgba(255,255,255,.64);
-  --panel-edge: #e9e6dd;
-  --track: #ffe4a8;
-  --off: #1b1e25;
-  --ok: #10b981;
-  --bad: #e11d48;
-  min-height: 100vh;
-  padding: 40px max(16px, calc((100vw - 760px) / 2)) 70px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  line-height: 1.45;
-  font-variant-numeric: tabular-nums;
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-  transition: background .6s ease, color .6s ease;
-}
-
-body.is-off {
-  --bg: #f1f0ee;
-  --text: #45454a;
-  --muted: #8f8f94;
-  --line: #dcdcde;
-  --hair: #e4e4e6;
-  --panel: rgba(255,255,255,.68);
-  --panel-edge: #d9d9db;
-  --off: #4a4a4f;
-  --ok: #8f8f94;
-  --bad: #4a4a4f;
-}
-
-.wrap { width: 100%; max-width: 760px; margin: 0 auto; }
-
-.card {
-  background: var(--panel);
-  border: 1px solid var(--panel-edge);
-  border-radius: 18px;
-  padding: 22px 24px;
-  margin-bottom: 14px;
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
-  transition: background .5s ease, border-color .5s ease;
-}
-
-.section-title { margin-bottom: 18px; }
-.section-title h2 {
-  font-size: 11px; font-weight: 750; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--muted);
-}
-
-.light-card { padding: 20px 22px; }
-
-.light-row {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-
-.light-toggle {
-  flex: 0 0 auto;
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
-  border: 1px solid var(--panel-edge);
-  background: var(--hair);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  position: relative;
-  transition: background .35s ease, border-color .35s ease,
-              box-shadow .35s ease, transform .15s ease;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  user-select: none;
-  -webkit-user-select: none;
-  overflow: visible;
-}
-.light-toggle svg {
-  width: 32px; height: 32px; display: block; overflow: visible;
-  pointer-events: none;
-}
-.light-toggle:active { transform: scale(.94); }
-
-.light-toggle .si-glass {
-  fill: rgba(120,125,135,.08); stroke: #8a8d93; stroke-width: 1.1;
-  transition: fill .4s ease, stroke .4s ease;
-}
-.light-toggle .si-cap { fill: #8a8d93; transition: fill .4s ease; }
-.light-toggle .si-filament {
-  stroke: #6a6d73; stroke-width: 1.2; transition: stroke .4s ease;
-}
-
-.light-toggle.is-lit {
-  background: linear-gradient(180deg, #ffd489, #ffc164);
-  border-color: #e9a83f;
-  box-shadow: 0 8px 22px rgba(255,180,70,.45),
-              0 1px 0 rgba(255,255,255,.75) inset;
-}
-.light-toggle.is-lit .si-glass { fill: rgba(255,210,124,.42); stroke: #e0a94e; }
-.light-toggle.is-lit .si-cap { fill: #bb8a3d; }
-.light-toggle.is-lit .si-filament {
-  stroke: #ff9d1f; filter: drop-shadow(0 0 3px rgba(255,170,50,1));
-}
-.light-toggle.is-lit svg {
-  filter: drop-shadow(0 0 6px rgba(255,186,74,.95))
-          drop-shadow(0 0 16px rgba(255,186,74,.55));
-}
-
-.conn-dot {
-  position: absolute;
-  top: -6px;
-  left: -6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #c9c9cd;
-  transition: background .3s ease;
-  z-index: 5;
-  pointer-events: none;
-}
-.conn-dot.ok { background: var(--ok); }
-.conn-dot.err { background: var(--bad); }
-
-.light-sliders {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.light-slider-row { display: flex; align-items: center; }
-.light-slider-row .ctrl-range { flex: 1 1 auto; min-width: 0; }
-
-.ctrl-range {
-  -webkit-appearance: none; appearance: none;
-  display: block; width: 100%; height: 22px;
-  background: transparent; cursor: pointer;
-  touch-action: pan-y;
-}
-.ctrl-range:focus { outline: none; }
-.ctrl-range:focus-visible { outline: 2px solid #e0a94e; outline-offset: 3px; border-radius: 999px; }
-
-.ctrl-range::-webkit-slider-runnable-track {
-  height: 8px; border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), inset 0 1px 2px rgba(0,0,0,.05);
-}
-.ctrl-range::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 20px; height: 20px; margin-top: -6px;
-  border-radius: 50%; background: #fff;
-  border: 1px solid rgba(0,0,0,.10);
-  box-shadow: 0 2px 7px rgba(0,0,0,.20), 0 1px 0 rgba(255,255,255,.9) inset;
-  transition: transform .15s ease;
-}
-.ctrl-range:active::-webkit-slider-thumb { transform: scale(1.12); }
-
-.ctrl-range::-moz-range-track {
-  height: 8px; border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
-}
-.ctrl-range::-moz-range-thumb {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; border: 1px solid rgba(0,0,0,.10);
-  box-shadow: 0 2px 7px rgba(0,0,0,.20);
-}
-
-.range-bright::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, #33343a 0%, #6f7077 38%, #ffd07a 78%, #ffe6ab 100%);
-}
-.range-bright::-moz-range-track {
-  background: linear-gradient(90deg, #33343a 0%, #6f7077 38%, #ffd07a 78%, #ffe6ab 100%);
-}
-
-.range-temp::-webkit-slider-runnable-track {
-  background: linear-gradient(90deg, #7fb4ff 0%, #bcd6ff 26%, #f2efe9 50%, #ffc98a 74%, #ff9f43 100%);
-}
-.range-temp::-moz-range-track {
-  background: linear-gradient(90deg, #7fb4ff 0%, #bcd6ff 26%, #f2efe9 50%, #ffc98a 74%, #ff9f43 100%);
-}
-
-.battery-block {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--hair);
-}
-.battery-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.battery-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 650;
-  color: var(--muted);
-}
-.battery-icon {
-  width: 22px; height: 12px; flex: 0 0 22px;
-  color: var(--muted); overflow: visible;
-}
-.battery-icon .b-shell { fill: none; stroke: currentColor; stroke-width: 1.2; }
-.battery-icon .b-tip { fill: currentColor; }
-.battery-icon .b-fill { fill: currentColor; }
-.battery-value {
-  font-size: 14px; font-weight: 750;
-  color: var(--text); font-variant-numeric: tabular-nums;
-}
-.battery-track {
-  position: relative; height: 8px; border-radius: 999px;
-  background: var(--hair); overflow: hidden;
-}
-.battery-fill {
-  height: 100%; width: 0%; border-radius: 999px;
-  background: linear-gradient(90deg, #7ee0a4, #10b981);
-  transition: width .6s ease, background .4s ease;
-}
-
-@media (max-width: 720px) {
-  body { padding: 22px 14px 50px; }
-  .card { padding: 18px; border-radius: 15px; margin-bottom: 11px; }
-  .light-card { padding: 16px; }
-  .light-row { gap: 14px; }
-  .light-toggle { width: 56px; height: 56px; }
-  .light-toggle svg { width: 28px; height: 28px; }
-  .conn-dot { width: 7px; height: 7px; top: -5px; left: -5px; }
-  .section-title { margin-bottom: 15px; }
-}
-</style>
-</head>
-<body class="is-on">
-<div class="wrap">
-
-  <!-- ============ БЛОК 1: лампа + яркость + температура + АКБ ============ -->
-  <section class="card light-card" aria-label="Управление светом">
-    <div class="section-title"><h2>УПРАВЛЕНИЕ СВЕТОМ</h2></div>
-    <div class="light-row">
-      <button class="light-toggle" id="lightToggle" type="button"
-              aria-label="Включить свет" aria-pressed="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path class="si-glass"
-            d="M12 2.5 C7.2 2.5 4 6 4 10 C4 12.8 5.4 15 7.4 16.6
-               L7.4 18 C7.4 18.8 7.9 19.4 8.8 19.4 L15.2 19.4
-               C16.1 19.4 16.6 18.8 16.6 18 L16.6 16.6
-               C18.6 15 20 12.8 20 10 C20 6 16.8 2.5 12 2.5 Z" />
-          <rect class="si-cap" x="8.5" y="19.6" width="7" height="2.4" rx=".5" />
-          <path class="si-filament"
-            d="M9.4 10 Q10.7 13.4 12 10 Q13.3 13.4 14.6 10"
-            fill="none" stroke-linecap="round" />
-        </svg>
-      </button>
-
-      <div class="light-sliders">
-        <div class="light-slider-row">
-          <input class="ctrl-range range-bright" id="brightness" type="range"
-                 min="0" max="100" step="1" value="70" aria-label="Яркость">
-        </div>
-        <div class="light-slider-row">
-          <input class="ctrl-range range-temp" id="temp" type="range"
-                 min="0" max="100" step="1" value="50" aria-label="Температура света">
-        </div>
-      </div>
-    </div>
-
-    <div class="battery-block">
-      <div class="battery-head">
-        <span class="battery-label">
-          <svg class="battery-icon" viewBox="0 0 26 14" aria-hidden="true">
-            <rect class="b-shell" x="0.6" y="0.6" width="21" height="12.8" rx="2.4"/>
-            <rect class="b-tip" x="23.2" y="4.5" width="2.4" height="5" rx="1"/>
-            <rect class="b-fill" id="batteryFillIcon" x="2.4" y="2.4" width="14" height="9.2" rx="1.4"/>
-          </svg>
-          Уровень заряда АКБ
-        </span>
-        <span class="battery-value" id="batteryValue">—%</span>
-      </div>
-      <div class="battery-track">
-        <div class="battery-fill" id="batteryFill"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ БЛОК 2: лампа + яркость (Wemos) ============ -->
-  <section class="card light-card" aria-label="Управление светом через Wemos">
-    <div class="section-title"><h2>УПРАВЛЕНИЕ (WEMOS)</h2></div>
-    <div class="light-row">
-      <button class="light-toggle" id="lightToggle2" type="button"
-              aria-label="Включить свет" aria-pressed="false">
-        <span class="conn-dot" id="connDot" aria-hidden="true"></span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path class="si-glass"
-            d="M12 2.5 C7.2 2.5 4 6 4 10 C4 12.8 5.4 15 7.4 16.6
-               L7.4 18 C7.4 18.8 7.9 19.4 8.8 19.4 L15.2 19.4
-               C16.1 19.4 16.6 18.8 16.6 18 L16.6 16.6
-               C18.6 15 20 12.8 20 10 C20 6 16.8 2.5 12 2.5 Z" />
-          <rect class="si-cap" x="8.5" y="19.6" width="7" height="2.4" rx=".5" />
-          <path class="si-filament"
-            d="M9.4 10 Q10.7 13.4 12 10 Q13.3 13.4 14.6 10"
-            fill="none" stroke-linecap="round" />
-        </svg>
-      </button>
-
-      <div class="light-sliders">
-        <div class="light-slider-row">
-          <input class="ctrl-range range-bright" id="brightness2" type="range"
-                 min="0" max="100" step="1" value="70" aria-label="Яркость">
-        </div>
-      </div>
-    </div>
-  </section>
-
-</div>
-
-<script>
-(function(){
-  console.log('[PULT] ===== ЗАГРУЗКА ПУЛЬТА =====');
-
-  // ---------- БЛОК 1: лампа + 2 ползунка + АКБ (визуальные) ----------
-  var tg1 = document.getElementById('lightToggle');
-  var br1 = document.getElementById('brightness');
-  var tp1 = document.getElementById('temp');
-
-  var on1 = localStorage.getItem('p1_on') !== '0';
-  var b1  = parseInt(localStorage.getItem('p1_brightness') || '70', 10);
-  var t1  = parseInt(localStorage.getItem('p1_temp') || '50', 10);
-  if (isNaN(b1)) b1 = 70;
-  if (isNaN(t1)) t1 = 50;
-
-  br1.value = b1;
-  tp1.value = t1;
-
-  function visual1() {
-    tg1.classList.toggle('is-lit', on1);
-    tg1.setAttribute('aria-pressed', on1 ? 'true' : 'false');
-    document.body.classList.toggle('is-on',  on1);
-    document.body.classList.toggle('is-off', !on1);
-  }
-
-  tg1.addEventListener('click', function() {
-    on1 = !on1;
-    localStorage.setItem('p1_on', on1 ? '1' : '0');
-    visual1();
-  });
-  br1.addEventListener('input', function() {
-    b1 = parseInt(br1.value, 10);
-    localStorage.setItem('p1_brightness', String(b1));
-  });
-  tp1.addEventListener('input', function() {
-    t1 = parseInt(tp1.value, 10);
-    localStorage.setItem('p1_temp', String(t1));
-  });
-
-  // АКБ — заглушка 87%
-  var batteryFill = document.getElementById('batteryFill');
-  var batteryFillIcon = document.getElementById('batteryFillIcon');
-  var batteryValue = document.getElementById('batteryValue');
-  var batteryLevel = 87;
-
-  function renderBattery(level) {
-    var lvl = Math.max(0, Math.min(100, Math.round(level)));
-    batteryValue.textContent = lvl + '%';
-    batteryFill.style.width = lvl + '%';
-
-    var c1, c2, cIcon;
-    if (lvl <= 15)      { c1 = '#fca5a5'; c2 = '#e11d48'; cIcon = '#e11d48'; }
-    else if (lvl <= 35) { c1 = '#fcd34d'; c2 = '#f59e0b'; cIcon = '#e0a94e'; }
-    else                { c1 = '#7ee0a4'; c2 = '#10b981'; cIcon = '#10b981'; }
-
-    batteryFill.style.background = 'linear-gradient(90deg, ' + c1 + ', ' + c2 + ')';
-
-    var trackW = 21, padX = 1.8;
-    var maxW = trackW - padX * 2;
-    var w = Math.max(0.8, (lvl / 100) * maxW);
-    batteryFillIcon.setAttribute('width', w.toFixed(2));
-    batteryFillIcon.setAttribute('fill', cIcon);
-  }
-  renderBattery(batteryLevel);
-
-  // ---------- БЛОК 2: реальное управление Wemos ----------
-  var tg2 = document.getElementById('lightToggle2');
-  var br2 = document.getElementById('brightness2');
-  var dot = document.getElementById('connDot');
-
-  var cur2 = parseInt(localStorage.getItem('wemos_brightness') || '70', 10);
-  if (isNaN(cur2)) cur2 = 70;
-  var lastNonZero2 = cur2 > 0 ? cur2 : 70;
-
-  br2.value = cur2;
-
-  function visual2() {
-    var on = cur2 > 0;
-    tg2.classList.toggle('is-lit', on);
-    tg2.setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
-
-  function send2(percent) {
-    var v = Math.max(0, Math.min(100, Math.round(percent)));
-    var url = '/set?val=' + v + '&_=' + Date.now();
-    console.log('[PULT] → fetch:', url);
-
-    fetch(url, { cache: 'no-store' })
-      .then(function(r) {
-        console.log('[PULT] ✓ Ответ:', r.status);
-        dot.classList.remove('err');
-        dot.classList.add('ok');
-      })
-      .catch(function(e) {
-        console.error('[PULT] ✗ Ошибка:', e);
-        dot.classList.remove('ok');
-        dot.classList.add('err');
-      });
-  }
-
-  var t2 = null, pending2 = null;
-  function queue2(v, immediate) {
-    pending2 = v;
-    if (immediate) {
-      if (t2) { clearTimeout(t2); t2 = null; }
-      var x = pending2; pending2 = null;
-      send2(x);
-      return;
-    }
-    if (t2) return;
-    t2 = setTimeout(function() {
-      t2 = null;
-      var x = pending2; pending2 = null;
-      if (x != null) send2(x);
-    }, 80);
-  }
-
-  br2.addEventListener('input', function() {
-    cur2 = parseInt(br2.value, 10);
-    if (cur2 > 0) lastNonZero2 = cur2;
-    visual2();
-    queue2(cur2, false);
-  });
-  br2.addEventListener('change', function() {
-    cur2 = parseInt(br2.value, 10);
-    if (cur2 > 0) lastNonZero2 = cur2;
-    localStorage.setItem('wemos_brightness', String(cur2));
-    visual2();
-    queue2(cur2, true);
-  });
-  tg2.addEventListener('click', function() {
-    if (cur2 > 0) { lastNonZero2 = cur2; cur2 = 0; }
-    else { cur2 = lastNonZero2 || 70; }
-    br2.value = cur2;
-    localStorage.setItem('wemos_brightness', String(cur2));
-    visual2();
-    queue2(cur2, true);
-  });
-
-  visual1();
-  visual2();
-  send2(cur2);
-
-  console.log('[PULT] ===== ПУЛЬТ ГОТОВ =====');
-})();
-</script>
-</body>
-</html>)HTML";
-
-// ================== ФУНКЦИИ ==================
 void applyBrightness(int percent) {
   percent = constrain(percent, 0, 100);
   brightness = percent;
   pwmValue = map(percent, 0, 100, 0, PWM_RANGE);
   analogWrite(PWM_PIN, pwmValue);
-  Serial.print("[PWM] Яркость: ");
-  Serial.print(percent);
-  Serial.print("%  ШИМ: ");
-  Serial.println(pwmValue);
+  Serial.printf("[PWM] %d%% -> %d\n", percent, pwmValue);
 }
 
-void saveBrightness() {
-  EEPROM.write(0, brightness);
-  EEPROM.commit();
-}
-
+void saveBrightness() { EEPROM.write(0, brightness); EEPROM.commit(); }
 void loadBrightness() {
-  int val = EEPROM.read(0);
-  if (val < 0 || val > 100) val = 70;
-  applyBrightness(val);
+  int v = EEPROM.read(0);
+  if (v < 0 || v > 100) v = 70;
+  applyBrightness(v);
 }
 
-void handleRoot() {
-  Serial.println("[HTTP] GET / — отдаю пульт");
-  server.sendHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
-  server.sendHeader("Pragma", "no-cache");
-  server.sendHeader("Expires", "0");
-  server.send_P(200, "text/html; charset=utf-8", INDEX_HTML);
+void sendCORS() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  server.sendHeader("Access-Control-Allow-Headers", "*");
+  server.sendHeader("Cache-Control", "no-store");
 }
 
 void handleSet() {
-  Serial.print("[HTTP] GET /set ");
-  for (uint8_t i = 0; i < server.args(); i++) {
-    Serial.print(server.argName(i));
-    Serial.print("=");
-    Serial.print(server.arg(i));
-    Serial.print(" ");
-  }
-  Serial.println();
-
+  sendCORS();
   if (server.hasArg("val")) {
-    int val = server.arg("val").toInt();
-    applyBrightness(val);
+    int v = server.arg("val").toInt();
+    applyBrightness(v);
     saveBrightness();
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.sendHeader("Cache-Control", "no-store");
     server.send(200, "text/plain", "OK");
   } else {
-    server.send(400, "text/plain", "Missing 'val'");
+    server.send(400, "text/plain", "Missing val");
   }
+}
+
+void handleStatus() {
+  sendCORS();
+  server.send(200, "application/json", "{\"val\":" + String(brightness) + "}");
 }
 
 void handleNotFound() {
-  Serial.print("[HTTP] 404: ");
-  Serial.println(server.uri());
+  sendCORS();
   server.send(404, "text/plain", "Not Found");
 }
 
-// ================== SETUP / LOOP ==================
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println();
-  Serial.println("=====================================");
-  Serial.println("     WEMOS D1 MINI PRO — СТАРТ v5");
-  Serial.println("=====================================");
+  Serial.println("\n=== ИСПОЛНИТЕЛЬ (1 MOSFET) ===");
 
   EEPROM.begin(512);
   loadBrightness();
-
   analogWriteRange(PWM_RANGE);
   analogWriteFreq(1000);
   pinMode(PWM_PIN, OUTPUT);
@@ -578,23 +71,16 @@ void setup() {
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  Serial.print("[WiFi] Подключение");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
-  Serial.print("[WiFi] IP: ");
-  Serial.println(WiFi.localIP());
+  Serial.print("[WiFi] Connecting");
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.printf("\n[WiFi] IP: %s\n", WiFi.localIP().toString().c_str());
+  Serial.println(">>> ЗАПОМНИ ЭТОТ IP — впиши его в ГЛАВНЫЙ скетч в EXECUTOR_IP <<<");
 
-  server.on("/",    handleRoot);
-  server.on("/set", handleSet);
+  server.on("/set",     handleSet);
+  server.on("/status",  handleStatus);
   server.onNotFound(handleNotFound);
   server.begin();
-  Serial.println("[HTTP] Сервер запущен");
-  Serial.println("=====================================");
+  Serial.println("[HTTP] Ready");
 }
 
-void loop() {
-  server.handleClient();
-}
+void loop() { server.handleClient(); }
