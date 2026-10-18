@@ -6,26 +6,162 @@
 const char* ssid     = "TP-Link_515A";
 const char* password = "21857638";
 
+// ====== СТАТИЧЕСКИЙ IP (спальня) ======
+IPAddress STATIC_IP (192, 168, 1, 51);
+IPAddress GATEWAY   (192, 168, 1, 1);
+IPAddress SUBNET    (255, 255, 255, 0);
+IPAddress DNS1      (192, 168, 1, 1);
+IPAddress DNS2      (8, 8, 8, 8);
+
 #define PWM_PIN   D1
 #define PWM_RANGE 1023
+
+#define EE_BRIGHT      0
+#define EE_LAST_BRIGHT 1
+
+// ====== WiFi ======
+const unsigned long WIFI_INITIAL_TIMEOUT_MS = 30000;
+const unsigned long WIFI_RETRY_INTERVAL_MS  = 30000;
+const unsigned long WIFI_AP_AFTER_MS        = 60000;
+#define AP_SSID "SVET-SPAL"
+#define AP_PASS "12345678"
+
+unsigned long lastWiFiRetryMs = 0;
+unsigned long lastOnlineMs    = 0;
+bool          wifiWasConnected = false;
 
 ESP8266WebServer server(80);
 int brightness = 70;
 int pwmValue   = 0;
 
+unsigned long lastSetMs   = 0;
+bool          savePending = false;
+const unsigned long SAVE_DELAY_MS = 2000;
+
+static inline int gammaMap(int percent) {
+  percent = constrain(percent, 0, 100);
+  float g = pow(percent / 100.0f, 2.2f);
+  return (int)(g * PWM_RANGE + 0.5f);
+}
+
 void applyBrightness(int percent) {
   percent = constrain(percent, 0, 100);
   brightness = percent;
-  pwmValue = map(percent, 0, 100, 0, PWM_RANGE);
+  pwmValue   = gammaMap(percent);
   analogWrite(PWM_PIN, pwmValue);
   Serial.printf("[PWM] %d%% -> %d\n", percent, pwmValue);
 }
 
-void saveBrightness() { EEPROM.write(0, brightness); EEPROM.commit(); }
+void saveBrightness() {
+  EEPROM.write(EE_BRIGHT, (uint8_t)brightness);
+  if (brightness > 0) {
+    EEPROM.write(EE_LAST_BRIGHT, (uint8_t)brightness);
+  }
+  EEPROM.commit();
+  Serial.println("[EEPROM] saved");
+}
+
 void loadBrightness() {
-  int v = EEPROM.read(0);
-  if (v < 0 || v > 100) v = 70;
-  applyBrightness(v);
+  uint8_t b  = EEPROM.read(EE_BRIGHT);
+  uint8_t lb = EEPROM.read(EE_LAST_BRIGHT);
+  if (b > 100) b = 70;
+  if (lb == 0 || lb > 100) lb = (b > 0 ? b : 70);
+  Serial.printf("[EEPROM] loaded bright=%d lastBright=%d\n", b, lb);
+  applyBrightness(b);
+}
+
+int getLastBright() {
+  uint8_t lb = EEPROM.read(EE_LAST_BRIGHT);
+  if (lb == 0 || lb > 100) return 70;
+  return lb;
+}
+
+// ===== WiFi helpers =====
+static const char* wifiStatusStr(int st) {
+  switch (st) {
+    case WL_IDLE_STATUS:     return "IDLE";
+    case WL_NO_SSID_AVAIL:   return "NO_SSID_AVAIL";
+    case WL_SCAN_COMPLETED:  return "SCAN_DONE";
+    case WL_CONNECTED:       return "CONNECTED";
+    case WL_CONNECT_FAILED:  return "CONNECT_FAILED";
+    case WL_CONNECTION_LOST: return "CONNECTION_LOST";
+    case WL_DISCONNECTED:    return "DISCONNECTED";
+    default:                 return "?";
+  }
+}
+
+void connectWiFiWithTimeout(unsigned long timeoutMs) {
+  Serial.print("[WiFi] Connecting to ");
+  Serial.print(ssid);
+  Serial.print(" ");
+  WiFi.begin(ssid, password);
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - start) < timeoutMs) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  int st = WiFi.status();
+  if (st == WL_CONNECTED) {
+    wifiWasConnected = true;
+    Serial.print("[WiFi] OK. IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.printf("[WiFi] FAIL after %lus (status=%d %s)\n",
+                  timeoutMs / 1000, st, wifiStatusStr(st));
+    Serial.println("[WiFi] Starting AP fallback...");
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(AP_SSID, AP_PASS);
+    Serial.print("[WiFi] AP SSID=");
+    Serial.print(AP_SSID);
+    Serial.print(" PASS=");
+    Serial.print(AP_PASS);
+    Serial.print("  -> http://");
+    Serial.println(WiFi.softAPIP());
+  }
+  lastWiFiRetryMs = millis();
+  lastOnlineMs    = millis();
+}
+
+void maintainWiFi() {
+  int st = WiFi.status();
+
+  if (st == WL_CONNECTED) {
+    lastOnlineMs = millis();
+    if (!wifiWasConnected) {
+      wifiWasConnected = true;
+      Serial.print("[WiFi] Connected. IP: ");
+      Serial.println(WiFi.localIP());
+      if (WiFi.getMode() == WIFI_AP_STA) {
+        WiFi.softAPdisconnect(true);
+        WiFi.mode(WIFI_STA);
+        Serial.println("[WiFi] AP disabled (STA OK)");
+      }
+    }
+    return;
+  }
+
+  if (wifiWasConnected) {
+    wifiWasConnected = false;
+    Serial.printf("[WiFi] Lost (status=%d %s)\n", st, wifiStatusStr(st));
+  }
+
+  if (millis() - lastWiFiRetryMs > WIFI_RETRY_INTERVAL_MS) {
+    Serial.println("[WiFi] Retry STA...");
+    WiFi.begin(ssid, password);
+    lastWiFiRetryMs = millis();
+  }
+
+  unsigned long offlineMs = millis() - lastOnlineMs;
+  if (offlineMs > WIFI_AP_AFTER_MS && WiFi.getMode() != WIFI_AP_STA) {
+    Serial.println("[WiFi] Long offline - AP fallback ON");
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAP(AP_SSID, AP_PASS);
+    Serial.printf("[WiFi] AP: %s / %s -> http://%s\n",
+                  AP_SSID, AP_PASS, WiFi.softAPIP().toString().c_str());
+  }
 }
 
 void sendCORS() {
@@ -37,19 +173,25 @@ void sendCORS() {
 
 void handleSet() {
   sendCORS();
-  if (server.hasArg("val")) {
-    int v = server.arg("val").toInt();
-    applyBrightness(v);
-    saveBrightness();
-    server.send(200, "text/plain", "OK");
-  } else {
-    server.send(400, "text/plain", "Missing val");
-  }
+  if (!server.hasArg("val")) { server.send(400, "text/plain", "Missing val"); return; }
+  String s = server.arg("val");
+  int v = s.toInt();
+  if (s.length() == 0 || v < 0 || v > 100) { server.send(400, "text/plain", "Bad val"); return; }
+
+  applyBrightness(v);
+  lastSetMs   = millis();
+  savePending = true;
+  server.send(200, "text/plain", "OK");
 }
 
 void handleStatus() {
   sendCORS();
-  server.send(200, "application/json", "{\"val\":" + String(brightness) + "}");
+  String json = "{\"val\":"         + String(brightness) +
+                ",\"pwm\":"         + String(pwmValue)   +
+                ",\"lastBright\":"  + String(getLastBright()) +
+                ",\"wifi\":"        + String(WiFi.status()) +
+                ",\"ip\":\""        + WiFi.localIP().toString() + "\"}";
+  server.send(200, "application/json", json);
 }
 
 void handleNotFound() {
@@ -60,27 +202,43 @@ void handleNotFound() {
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("\n=== ИСПОЛНИТЕЛЬ (1 MOSFET) ===");
+  Serial.println("\n=== СПАЛЬНЯ (1 MOSFET, D1) ===");
+
+  pinMode(PWM_PIN, OUTPUT);
+  analogWriteRange(PWM_RANGE);
+  analogWriteFreq(2000);
 
   EEPROM.begin(512);
   loadBrightness();
-  analogWriteRange(PWM_RANGE);
-  analogWriteFreq(1000);
-  pinMode(PWM_PIN, OUTPUT);
-  analogWrite(PWM_PIN, pwmValue);
-
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.print("[WiFi] Connecting");
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
-  Serial.printf("\n[WiFi] IP: %s\n", WiFi.localIP().toString().c_str());
-  Serial.println(">>> ЗАПОМНИ ЭТОТ IP — впиши его в ГЛАВНЫЙ скетч в EXECUTOR_IP <<<");
 
   server.on("/set",     handleSet);
   server.on("/status",  handleStatus);
   server.onNotFound(handleNotFound);
   server.begin();
-  Serial.println("[HTTP] Ready");
+  Serial.println("[HTTP] Server started");
+
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  WiFi.setOutputPower(20.5);
+
+  if (!WiFi.config(STATIC_IP, GATEWAY, SUBNET, DNS1, DNS2)) {
+    Serial.println("[WiFi] config() FAILED — будет DHCP");
+  }
+  Serial.print("[WiFi] MAC: ");
+  Serial.println(WiFi.macAddress());
+
+  connectWiFiWithTimeout(WIFI_INITIAL_TIMEOUT_MS);
+  Serial.println(">>> IP спальни: 192.168.1.51 <<<");
 }
 
-void loop() { server.handleClient(); }
+void loop() {
+  server.handleClient();
+  maintainWiFi();
+
+  if (savePending && (millis() - lastSetMs > SAVE_DELAY_MS)) {
+    saveBrightness();
+    savePending = false;
+  }
+}
