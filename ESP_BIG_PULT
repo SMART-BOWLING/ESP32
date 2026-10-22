@@ -195,22 +195,15 @@ void sendCORS() {
 }
 
 // ================== SVG / MANIFEST / HTML ==================
-const char ICON_SVG[] PROGMEM = R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-<defs>
-<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="#ffd489"/>
-<stop offset="1" stop-color="#ffc164"/>
-</linearGradient>
-<radialGradient id="glow" cx="0.5" cy="0.42" r="0.55">
-<stop offset="0" stop-color="#fff6dd" stop-opacity="1"/>
-<stop offset="1" stop-color="#fff6dd" stop-opacity="0"/>
-</radialGradient>
-</defs>
-<rect width="180" height="180" rx="40" fill="url(#bg)"/>
-<circle cx="90" cy="76" r="58" fill="url(#glow)"/>
-<path d="M90 40 C60 40 40 62 40 88 C40 106 49 120 62 130 L62 138 C62 143 65 146 70 146 L110 146 C115 146 118 143 118 138 L118 130 C131 120 140 106 140 88 C140 62 120 40 90 40 Z" fill="#fff8e6" stroke="#c9954a" stroke-width="2.5"/>
-<rect x="70" y="148" width="40" height="14" rx="3" fill="#bb8a3d"/>
-<path d="M74 88 Q82 108 90 88 Q98 108 106 88" fill="none" stroke="#ff9d1f" stroke-width="3.5" stroke-linecap="round"/>
+// Новая иконка: только две толстые дуги и ползунки
+const char ICON_SVG[] PROGMEM = R"SVG(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#12151c"/>
+  <path d="M 256 60 A 196 196 0 0 0 60 256" fill="none" stroke="#ffb43a" stroke-width="36" stroke-linecap="round"/>
+  <circle cx="60" cy="256" r="24" fill="#ffb43a"/>
+  <circle cx="60" cy="256" r="12" fill="#ffffff"/>
+  <path d="M 256 452 A 196 196 0 0 0 452 256" fill="none" stroke="#4da6ff" stroke-width="36" stroke-linecap="round"/>
+  <circle cx="452" cy="256" r="24" fill="#4da6ff"/>
+  <circle cx="452" cy="256" r="12" fill="#ffffff"/>
 </svg>)SVG";
 
 const char MANIFEST_JSON[] PROGMEM = R"JSON({
@@ -221,12 +214,12 @@ const char MANIFEST_JSON[] PROGMEM = R"JSON({
 "scope": "/",
 "display": "standalone",
 "orientation": "portrait",
-"background_color": "#fbfaf6",
-"theme_color": "#fbfaf6",
+"background_color": "#07090f",
+"theme_color": "#07090f",
 "lang": "ru",
 "icons": [
-  { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-  { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  { "src": "/icon2.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+  { "src": "/icon2.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
 ]
 })JSON";
 
@@ -234,393 +227,641 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fbfaf6">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#07090f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="СВЕТ ДОМ">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="application-name" content="СВЕТ ДОМ">
-<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="icon" type="image/svg+xml" href="/icon2.svg">
 <link rel="manifest" href="/manifest.json">
 <title>СВЕТ ДОМ</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  --bg: #fbfaf6; --text: #16181d; --muted: #7a7d85; --line: #e8e5dc;
-  --hair: #eeece5; --panel: rgba(255,255,255,.64); --panel-edge: #e9e6dd;
-  --off: #1b1e25; --ok: #10b981; --bad: #e11d48;
-  min-height: 100vh;
-  padding: 40px max(16px, calc((100vw - 760px) / 2)) 70px;
-  background: var(--bg); color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-  line-height: 1.45; font-variant-numeric: tabular-nums;
-  -webkit-font-smoothing: antialiased; overflow-x: hidden;
-  transition: background .6s ease, color .6s ease;
+:root{
+  color-scheme:dark;
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --bg:#07090f;
+  --line:#ffffff14;
+  --text:#f4f7ff;
+  --muted:#8b94aa;
 }
-body.is-off {
-  --bg: #f1f0ee; --text: #45454a; --muted: #8f8f94; --line: #dcdcde;
-  --hair: #e4e4e6; --panel: rgba(255,255,255,.68); --panel-edge: #d9d9db;
-  --off: #4a4a4f; --ok: #8f8f94; --bad: #4a4a4f;
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  margin:0;width:100%;height:100%;overflow:hidden;
+  touch-action:manipulation;overscroll-behavior:none;
 }
-.wrap { width: 100%; max-width: 760px; margin: 0 auto; }
-.card {
-  background: var(--panel); border: 1px solid var(--panel-edge);
-  border-radius: 18px; padding: 22px 24px; margin-bottom: 14px;
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
-  transition: background .5s ease, border-color .5s ease;
+body{
+  position:relative;background:var(--bg);color:var(--text);isolation:isolate;
+  --main-level:.72;--accent-level:.45;--bg-lift:.40;
 }
-.section-title { margin-bottom: 18px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.section-title h2 {
-  font-size: 11px; font-weight: 750; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--muted);
+.ambient,.darkness{position:fixed;inset:0;pointer-events:none}
+.ambient{z-index:0;transition:opacity .18s linear,filter .18s linear}
+.ambient-main{
+  background:
+    radial-gradient(circle at 24% 18%,rgba(255,197,138,.95) 0,rgba(255,197,138,.45) 18%,rgba(255,197,138,0) 42%),
+    radial-gradient(circle at 50% 45%,rgba(255,235,205,.26) 0,rgba(255,235,205,0) 52%);
+  opacity:var(--main-level);filter:blur(14px);
 }
-.section-title .room-tag {
-  font-size: 10px; font-weight: 700; letter-spacing: .08em;
-  padding: 3px 8px; border-radius: 999px;
-  background: var(--hair); color: var(--muted);
-  border: 1px solid var(--panel-edge);
+.ambient-accent{
+  background:
+    radial-gradient(circle at 78% 72%,rgba(255,183,102,.72) 0,rgba(255,183,102,.26) 20%,rgba(185,167,255,0) 44%),
+    radial-gradient(circle at 88% 14%,rgba(255,218,162,.34) 0,rgba(158,201,255,0) 34%);
+  opacity:calc(var(--accent-level) * .9);filter:blur(18px);
 }
-.light-card { padding: 20px 22px; }
-.light-row { display: flex; align-items: center; gap: 18px; }
-.light-toggle {
-  flex: 0 0 auto; width: 62px; height: 62px; border-radius: 50%;
-  border: 1px solid var(--panel-edge); background: var(--hair);
-  display: grid; place-items: center; cursor: pointer; position: relative;
-  transition: background .35s ease, border-color .35s ease,
-              box-shadow .35s ease, transform .15s ease;
-  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-  user-select: none; -webkit-user-select: none; overflow: visible;
+.darkness{
+  z-index:1;background:rgba(0,0,0,calc(.72 - var(--bg-lift) * .42));
+  transition:background .18s linear;
 }
-.light-toggle svg { width: 32px; height: 32px; display: block; overflow: visible; pointer-events: none; }
-.light-toggle:active { transform: scale(.94); }
-.light-toggle .si-glass { fill: rgba(120,125,135,.08); stroke: #8a8d93; stroke-width: 1.1; transition: fill .4s ease, stroke .4s ease; }
-.light-toggle .si-cap { fill: #8a8d93; transition: fill .4s ease; }
-.light-toggle .si-filament { stroke: #6a6d73; stroke-width: 1.2; transition: stroke .4s ease; }
-.light-toggle.is-lit {
-  background: linear-gradient(180deg, #ffd489, #ffc164);
-  border-color: #e9a83f;
-  box-shadow: 0 8px 22px rgba(255,180,70,.45), 0 1px 0 rgba(255,255,255,.75) inset;
+.app{
+  position:relative;z-index:2;height:100dvh;height:100svh;
+  padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom)) 10px;
+  display:flex;align-items:stretch;
 }
-.light-toggle.is-lit .si-glass { fill: rgba(255,210,124,.42); stroke: #e0a94e; }
-.light-toggle.is-lit .si-cap { fill: #bb8a3d; }
-.light-toggle.is-lit .si-filament { stroke: #ff9d1f; filter: drop-shadow(0 0 3px rgba(255,170,50,1)); }
-.light-toggle.is-lit svg { filter: drop-shadow(0 0 6px rgba(255,186,74,.95)) drop-shadow(0 0 16px rgba(255,186,74,.55)); }
-.conn-dot {
-  position: absolute; top: -6px; left: -6px; width: 8px; height: 8px;
-  border-radius: 50%; background: #c9c9cd; transition: background .3s ease;
-  z-index: 5; pointer-events: none;
+.grid{flex:1;display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:10px;min-height:0}
+.card{
+  --accent:#ffc58a;position:relative;min-width:0;min-height:0;
+  border:1px solid var(--line);border-radius:24px;
+  background:linear-gradient(160deg,#151b28dd,#0d111add 58%,#0b0e16);
+  box-shadow:0 18px 40px rgba(0,0,0,.38),inset 0 1px rgba(255,255,255,.06);
+  padding:10px 11px 6px;display:flex;flex-direction:column;overflow:hidden;isolation:isolate;
 }
-.conn-dot.ok { background: var(--ok); }
-.conn-dot.err { background: var(--bad); }
-.light-sliders { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-.light-slider-row { display: flex; align-items: center; }
-.light-slider-row .ctrl-range { flex: 1 1 auto; min-width: 0; }
-.ctrl-range {
-  -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 22px;
-  background: transparent; cursor: pointer; touch-action: pan-y;
+.card::before{
+  content:"";position:absolute;inset:auto 12% 38% 12%;height:34%;
+  background:var(--accent);opacity:.14;filter:blur(58px);z-index:-1;transition:opacity .25s;
 }
-.ctrl-range:focus { outline: none; }
-.ctrl-range:focus-visible { outline: 2px solid #e0a94e; outline-offset: 3px; border-radius: 999px; }
-.ctrl-range::-webkit-slider-runnable-track {
-  height: 8px; border-radius: 999px;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), inset 0 1px 2px rgba(0,0,0,.05);
+.card.secondary{--accent:#ffbf79}
+.card.off::before{opacity:.03}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:0;position:relative;z-index:2}
+.title-wrap{display:flex;align-items:flex-start;gap:0;min-width:0}
+.title{min-width:0;padding-top:2px}
+.name{font-size:12px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:10px;color:var(--muted);margin-top:1px}
+.toggle{
+  width:42px;height:24px;border-radius:999px;border:1px solid #ffffff15;
+  background:#2a3142;position:relative;flex:none;cursor:pointer;transition:.2s;
 }
-.ctrl-range::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none; width: 20px; height: 20px;
-  margin-top: -6px; border-radius: 50%; background: #fff;
-  border: 1px solid rgba(0,0,0,.10);
-  box-shadow: 0 2px 7px rgba(0,0,0,.20), 0 1px 0 rgba(255,255,255,.9) inset;
-  transition: transform .15s ease;
+.toggle::before{
+  content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;
+  background:#8892a8;transition:.2s;
 }
-.ctrl-range:active::-webkit-slider-thumb { transform: scale(1.12); }
-.ctrl-range::-moz-range-track { height: 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
-.ctrl-range::-moz-range-thumb {
-  width: 18px; height: 18px; border-radius: 50%; background: #fff;
-  border: 1px solid rgba(0,0,0,.10); box-shadow: 0 2px 7px rgba(0,0,0,.20);
+.toggle.on{background:var(--accent);box-shadow:0 0 16px color-mix(in srgb,var(--accent),transparent 68%)}
+.toggle.on::before{transform:translateX(18px);background:#161b26}
+.dial-wrap{flex:1;min-height:0;display:grid;place-items:center;padding:0;container-type:size}
+.dial{
+  width:min(100%,43svh,370px);width:min(100cqw,100cqh,370px);
+  min-width:0;aspect-ratio:1;position:relative;touch-action:none;outline:none;
 }
-.range-bright::-webkit-slider-runnable-track { background: linear-gradient(90deg,#33343a 0%,#6f7077 38%,#ffd07a 78%,#ffe6ab 100%); }
-.range-bright::-moz-range-track { background: linear-gradient(90deg,#33343a 0%,#6f7077 38%,#ffd07a 78%,#ffe6ab 100%); }
-.range-temp::-webkit-slider-runnable-track { background: linear-gradient(90deg,#7fb4ff 0%,#bcd6ff 26%,#f2efe9 50%,#ffc98a 74%,#ff9f43 100%); }
-.range-temp::-moz-range-track { background: linear-gradient(90deg,#7fb4ff 0%,#bcd6ff 26%,#f2efe9 50%,#ffc98a 74%,#ff9f43 100%); }
-
-@media (max-width: 720px) {
-  body { padding: 22px 14px 50px; }
-  .card { padding: 18px; border-radius: 15px; margin-bottom: 11px; }
-  .light-card { padding: 16px; }
-  .light-row { gap: 14px; }
-  .light-toggle { width: 56px; height: 56px; }
-  .light-toggle svg { width: 28px; height: 28px; }
-  .conn-dot { width: 7px; height: 7px; top: -5px; left: -5px; }
-  .section-title { margin-bottom: 15px; }
+.dial svg{width:100%;height:100%;display:block;overflow:visible}
+.track{fill:none;stroke:#293041;stroke-width:10;stroke-linecap:round}
+.progress{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;filter:drop-shadow(0 0 9px var(--accent))}
+.thumb{fill:#fff;stroke:var(--accent);stroke-width:4.5;filter:drop-shadow(0 0 8px var(--accent))}
+.inner{
+  position:absolute;inset:19%;border-radius:50%;
+  background:linear-gradient(150deg,#171d2b,#0d121b);
+  border:1px solid #ffffff10;box-shadow:inset 0 8px 22px rgba(0,0,0,.34);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
+}
+.value{font-size:clamp(26px,8.5vw,42px);font-weight:800;letter-spacing:-.08em;line-height:1}
+.value span{font-size:.42em;vertical-align:super;color:#9aa4b8;margin-left:2px}
+.caption{font-size:9px;font-weight:700;letter-spacing:.18em;color:#7f8aa1;margin-top:4px}
+.dial .temp-hit{position:absolute;inset:0;touch-action:none;outline:none;background:transparent;border:0;padding:0;appearance:none;pointer-events:none}
+.dial .temp-hit svg{width:100%;height:100%;display:block;overflow:visible}
+.temp-track{fill:none;stroke:#293041;stroke-width:7;stroke-linecap:round;opacity:.7}
+.temp-spectrum path{fill:none;stroke-width:8;stroke-linecap:butt}
+.temp-thumb{fill:#ffd7aa;stroke:#fff;stroke-width:3;pointer-events:auto;cursor:grab;filter:drop-shadow(0 0 8px #ffd7aa)}
+.bottom{flex:none}
+.range{
+  appearance:none;width:100%;margin:0;height:10px;border-radius:999px;
+  background:linear-gradient(90deg,#ff955a,#ffd49c 34%,#fff1de 55%,#bbdfff 76%,#79b1ff);
+  border:1px solid #ffffff2e;
+}
+.range::-webkit-slider-thumb{
+  appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:4px solid #171d29;
+  box-shadow:0 0 0 2px #ffffffbb,0 4px 10px rgba(0,0,0,.5);
+}
+.range::-moz-range-thumb{
+  width:12px;height:12px;border-radius:50%;background:#fff;border:4px solid #171d29;
+  box-shadow:0 0 0 2px #ffffffbb,0 4px 10px rgba(0,0,0,.5);
+}
+.card[data-name="main"] .dial-wrap{padding:0;margin-top:-20px}
+.card[data-name="main"] .dial{width:min(100%,43svh,370px);width:min(100cqw,100cqh,370px)}
+.card.secondary .dial-wrap{margin-top:-14px}
+.card.off .dial-wrap{opacity:.34;filter:grayscale(1);pointer-events:none}
+@media (max-width:380px){
+  .card{padding:10px 10px 8px;border-radius:21px}
+  .name{font-size:11px}
+  .sub{font-size:9px}
+  .caption{font-size:8px}
+}
+@media (max-height:650px){
+  .card{padding:7px 10px 4px}.top{margin-bottom:0}.grid{gap:7px}.dial-wrap{margin-top:-10px}
+  .card[data-name="main"] .dial-wrap{margin-top:-14px}
 }
 </style>
 </head>
-<body class="is-on">
-<div class="wrap">
-
-  <section class="card light-card" aria-label="Гостиная — основной свет">
-    <div class="section-title">
-      <h2>ОСНОВНОЙ СВЕТ (ЯРКОСТЬ + ОТТЕНОК)</h2>
-      <span class="room-tag">ГОСТИНАЯ</span>
-    </div>
-    <div class="light-row">
-      <button class="light-toggle" id="lightToggle" type="button" aria-label="Включить свет в гостиной" aria-pressed="false">
-        <span class="conn-dot" id="connDot1" aria-hidden="true"></span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path class="si-glass" d="M12 2.5 C7.2 2.5 4 6 4 10 C4 12.8 5.4 15 7.4 16.6 L7.4 18 C7.4 18.8 7.9 19.4 8.8 19.4 L15.2 19.4 C16.1 19.4 16.6 18.8 16.6 18 L16.6 16.6 C18.6 15 20 12.8 20 10 C20 6 16.8 2.5 12 2.5 Z" />
-          <rect class="si-cap" x="8.5" y="19.6" width="7" height="2.4" rx=".5" />
-          <path class="si-filament" d="M9.4 10 Q10.7 13.4 12 10 Q13.3 13.4 14.6 10" fill="none" stroke-linecap="round" />
-        </svg>
-      </button>
-      <div class="light-sliders">
-        <div class="light-slider-row">
-          <input class="ctrl-range range-bright" id="brightness" type="range" min="0" max="100" step="1" value="70" aria-label="Яркость гостиной">
+<body>
+<div class="ambient ambient-main"></div>
+<div class="ambient ambient-accent"></div>
+<div class="darkness"></div>
+<div class="app">
+  <section class="grid">
+    <article class="card" data-name="main" data-value="72" data-temp="3800">
+      <div class="top">
+        <div class="title-wrap">
+          <div class="title">
+            <div class="name">Гостиная</div>
+            <div class="sub"><span class="status-text">Вкл</span> · <span class="status-value">72%</span></div>
+          </div>
         </div>
-        <div class="light-slider-row">
-          <input class="ctrl-range range-temp" id="tone" type="range" min="0" max="100" step="1" value="50" aria-label="Оттенок: 0=холодный, 100=тёплый">
+        <button class="toggle on" type="button" aria-label="Переключить основной свет" aria-pressed="true"></button>
+      </div>
+
+      <div class="dial-wrap">
+        <div class="dial main-dial" role="slider" tabindex="0" aria-label="Яркость основного света" aria-valuemin="0" aria-valuemax="100" aria-valuenow="72">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <path class="track"></path>
+            <path class="progress"></path>
+            <circle class="thumb" r="7"></circle>
+          </svg>
+
+          <div class="temp-hit" role="slider" tabindex="0" aria-label="Оттенок света в гостиной" aria-valuemin="2700" aria-valuemax="6500" aria-valuenow="3800">
+            <svg viewBox="0 0 240 240" aria-hidden="true">
+              <defs>
+                <linearGradient id="tempGrad" x1="12%" y1="50%" x2="88%" y2="50%">
+                  <stop offset="0%" stop-color="#ff955a"></stop>
+                  <stop offset="45%" stop-color="#ffe1bf"></stop>
+                  <stop offset="100%" stop-color="#86bcff"></stop>
+                </linearGradient>
+              </defs>
+              <path class="temp-track"></path>
+              <g class="temp-spectrum"></g>
+              <circle class="temp-thumb" r="7"></circle>
+            </svg>
+          </div>
+
+          <div class="inner">
+            <div class="value">72<span>%</span></div>
+            <div class="caption">ЯРКОСТЬ</div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </article>
 
-  <section class="card light-card" aria-label="Спальня — дополнительный свет">
-    <div class="section-title">
-      <h2>ДОПОЛНИТЕЛЬНЫЙ СВЕТ</h2>
-      <span class="room-tag">СПАЛЬНЯ</span>
-    </div>
-    <div class="light-row">
-      <button class="light-toggle" id="lightToggle2" type="button" aria-label="Включить свет в спальне" aria-pressed="false">
-        <span class="conn-dot" id="connDot2" aria-hidden="true"></span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path class="si-glass" d="M12 2.5 C7.2 2.5 4 6 4 10 C4 12.8 5.4 15 7.4 16.6 L7.4 18 C7.4 18.8 7.9 19.4 8.8 19.4 L15.2 19.4 C16.1 19.4 16.6 18.8 16.6 18 L16.6 16.6 C18.6 15 20 12.8 20 10 C20 6 16.8 2.5 12 2.5 Z" />
-          <rect class="si-cap" x="8.5" y="19.6" width="7" height="2.4" rx=".5" />
-          <path class="si-filament" d="M9.4 10 Q10.7 13.4 12 10 Q13.3 13.4 14.6 10" fill="none" stroke-linecap="round" />
-        </svg>
-      </button>
-      <div class="light-sliders">
-        <div class="light-slider-row">
-          <input class="ctrl-range range-bright" id="brightness2" type="range" min="0" max="100" step="1" value="70" aria-label="Яркость спальни">
+    <article class="card secondary" data-name="accent" data-value="45">
+      <div class="top">
+        <div class="title-wrap">
+          <div class="title">
+            <div class="name">Спальня</div>
+            <div class="sub"><span class="status-text">Вкл</span> · <span class="status-value">45%</span></div>
+          </div>
+        </div>
+        <button class="toggle on" type="button" aria-label="Переключить дополнительный свет" aria-pressed="true"></button>
+      </div>
+
+      <div class="dial-wrap">
+        <div class="dial" role="slider" tabindex="0" aria-label="Яркость дополнительного света" aria-valuemin="0" aria-valuemax="100" aria-valuenow="45">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <path class="track"></path>
+            <path class="progress"></path>
+            <circle class="thumb" r="7"></circle>
+          </svg>
+          <div class="inner">
+            <div class="value">45<span>%</span></div>
+            <div class="caption">ЯРКОСТЬ</div>
+          </div>
         </div>
       </div>
-    </div>
+    </article>
   </section>
-
 </div>
+
 <script>
 (function(){
-  console.log('[PULT] ===== ЗАГРУЗКА =====');
+  'use strict';
 
-  function setDot(dot, ok) {
-    if (ok) { dot.classList.remove('err'); dot.classList.add('ok'); }
-    else    { dot.classList.remove('ok');  dot.classList.add('err'); }
+  var CENTER=120, RADIUS=90, START=135, SPAN=270;
+  var TEMP_CX=120, TEMP_CY=120, TEMP_R=121, TEMP_START=228, TEMP_SPAN=84;
+  var TEMP_MIN=2700, TEMP_MAX=6500;
+  var EXECUTOR='http://192.168.1.51';
+
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function point(deg){
+    return {x:CENTER+RADIUS*Math.sin(deg*Math.PI/180), y:CENTER-RADIUS*Math.cos(deg*Math.PI/180)};
+  }
+  function arcPath(a,b){
+    var p=point(a),q=point(b);
+    return 'M '+p.x+' '+p.y+' A '+RADIUS+' '+RADIUS+' 0 '+(b-a>180?1:0)+' 1 '+q.x+' '+q.y;
+  }
+  function tempPoint(deg){
+    return {x:TEMP_CX+TEMP_R*Math.sin(deg*Math.PI/180), y:TEMP_CY-TEMP_R*Math.cos(deg*Math.PI/180)};
+  }
+  function tempArcPath(a,b){
+    var p=tempPoint(a),q=tempPoint(b);
+    return 'M '+p.x+' '+p.y+' A '+TEMP_R+' '+TEMP_R+' 0 '+(b-a>180?1:0)+' 1 '+q.x+' '+q.y;
   }
 
-  // ===================== ГОСТИНАЯ =====================
-  var tg1  = document.getElementById('lightToggle');
-  var br1  = document.getElementById('brightness');
-  var tn1  = document.getElementById('tone');
-  var dot1 = document.getElementById('connDot1');
-
-  var b1     = parseInt(localStorage.getItem('p1_bright')     || '70', 10);
-  var t1     = parseInt(localStorage.getItem('p1_tone')       || '50', 10);
-  var lastB1 = parseInt(localStorage.getItem('p1_lastBright') || '70', 10);
-  if (isNaN(b1) || b1 < 0 || b1 > 100) b1 = 70;
-  if (isNaN(t1) || t1 < 0 || t1 > 100) t1 = 50;
-  if (isNaN(lastB1) || lastB1 <= 0 || lastB1 > 100) lastB1 = (b1 > 0 ? b1 : 70);
-
-  br1.value = b1;
-  tn1.value = t1;
-
-  function isOn1() { return b1 > 0; }
-
-  function visual1() {
-    var on = isOn1();
-    tg1.classList.toggle('is-lit', on);
-    tg1.setAttribute('aria-pressed', on ? 'true' : 'false');
-    document.body.classList.toggle('is-on',  on);
-    document.body.classList.toggle('is-off', !on);
+  function kelvinToTone(k){
+    var n=(clamp(k,TEMP_MIN,TEMP_MAX)-TEMP_MIN)/(TEMP_MAX-TEMP_MIN);
+    return Math.round((1-n)*100);
+  }
+  function toneToKelvin(t){
+    var n=1-clamp(t,0,100)/100;
+    return Math.round((TEMP_MIN+n*(TEMP_MAX-TEMP_MIN))/100)*100;
+  }
+  function mixColor(a,b,t){
+    var x=parseInt(a.slice(1),16), y=parseInt(b.slice(1),16);
+    var c=[16,8,0].map(function(s){
+      return Math.round(((x>>s)&255)*(1-t)+((y>>s)&255)*t);
+    });
+    return '#'+c.map(function(v){return v.toString(16).padStart(2,'0');}).join('');
   }
 
-  var pending1  = null;
-  var inFlight1 = false;
+  var cardMain=document.querySelector('.card[data-name="main"]');
+  var dialMain=cardMain.querySelector('.dial');
+  var trackMain=dialMain.querySelector('.track');
+  var progMain=dialMain.querySelector('.progress');
+  var thumbMain=dialMain.querySelector('.thumb');
+  var valMain=cardMain.querySelector('.value');
+  var statValMain=cardMain.querySelector('.status-value');
+  var statTxtMain=cardMain.querySelector('.status-text');
+  var toggleMain=cardMain.querySelector('.toggle');
+  var tempHit=cardMain.querySelector('.temp-hit');
+  var tempTrack=cardMain.querySelector('.temp-track');
+  var tempThumb=cardMain.querySelector('.temp-thumb');
+  var tempSpec=cardMain.querySelector('.temp-spectrum');
 
-  function sendMainNow(bright, tone) {
-    inFlight1 = true;
-    var url = '/set?bright=' + Math.round(bright) +
-              '&tone='   + Math.round(tone)   +
-              '&_=' + Date.now();
-    fetch(url, { cache: 'no-store' })
-      .then(function(){ setDot(dot1, true); })
-      .catch(function(){ setDot(dot1, false); })
+  var b1=parseInt(localStorage.getItem('p1_bright')||'70',10);
+  if(isNaN(b1)||b1<0||b1>100) b1=70;
+  var t1=parseInt(localStorage.getItem('p1_tone')||'50',10);
+  if(isNaN(t1)||t1<0||t1>100) t1=50;
+  var lastB1=parseInt(localStorage.getItem('p1_lastBright')||'70',10);
+  if(isNaN(lastB1)||lastB1<=0||lastB1>100) lastB1=(b1>0?b1:70);
+  var tempK=toneToKelvin(t1);
+
+  trackMain.setAttribute('d', arcPath(START, START+SPAN));
+  tempTrack.setAttribute('d', tempArcPath(TEMP_START, TEMP_START+TEMP_SPAN));
+
+  (function(){
+    var NS='http://www.w3.org/2000/svg';
+    function colorForKelvin(k){
+      return k<4000
+        ? mixColor('#ff9855','#ffe4bd',(k-2700)/1300)
+        : mixColor('#ffe4bd','#8dbfff',(k-4000)/2500);
+    }
+    var segs=64;
+    for(var i=0;i<segs;i++){
+      var a=TEMP_START+TEMP_SPAN*i/segs;
+      var b=TEMP_START+TEMP_SPAN*(i+1)/segs+(i===segs-1?0:.12);
+      var path=document.createElementNS(NS,'path');
+      path.setAttribute('d', tempArcPath(a,b));
+      path.setAttribute('stroke', colorForKelvin(TEMP_MIN+(TEMP_MAX-TEMP_MIN)*(i+.5)/segs));
+      tempSpec.appendChild(path);
+    }
+    [[TEMP_START,TEMP_MIN],[TEMP_START+TEMP_SPAN,TEMP_MAX]].forEach(function(pair){
+      var p=tempPoint(pair[0]);
+      var cap=document.createElementNS(NS,'circle');
+      cap.setAttribute('cx',p.x); cap.setAttribute('cy',p.y);
+      cap.setAttribute('r','4');
+      cap.setAttribute('fill', colorForKelvin(pair[1]));
+      cap.setAttribute('pointer-events','none');
+      tempSpec.appendChild(cap);
+    });
+  })();
+
+  function renderMain(){
+    var on=b1>0;
+    cardMain.classList.toggle('off', !on);
+    toggleMain.classList.toggle('on', on);
+    toggleMain.setAttribute('aria-pressed', on?'true':'false');
+    statTxtMain.textContent = on?'Вкл':'Выкл';
+
+    var angle=START+SPAN*b1/100;
+    var p=point(angle);
+    progMain.setAttribute('d', b1===0 ? 'M '+point(START).x+' '+point(START).y : arcPath(START,angle));
+    thumbMain.setAttribute('cx',p.x); thumbMain.setAttribute('cy',p.y);
+    valMain.innerHTML=b1+'<span>%</span>';
+    statValMain.textContent=b1+'%';
+    dialMain.setAttribute('aria-valuenow', String(b1));
+
+    var level=(on?b1:0)/100;
+    document.body.style.setProperty('--main-level', String(Math.max(.06,level)));
+    document.body.style.setProperty('--bg-lift', String(level));
+
+    var norm=(clamp(tempK,TEMP_MIN,TEMP_MAX)-TEMP_MIN)/(TEMP_MAX-TEMP_MIN);
+    var ta=TEMP_START+TEMP_SPAN*norm;
+    var tp=tempPoint(ta);
+    tempThumb.setAttribute('cx',tp.x); tempThumb.setAttribute('cy',tp.y);
+    tempHit.setAttribute('aria-valuenow', String(tempK));
+
+    var col = tempK<4000
+      ? mixColor('#ff9855','#ffe4bd',(tempK-2700)/1300)
+      : mixColor('#ffe4bd','#8dbfff',(tempK-4000)/2500);
+    cardMain.style.setProperty('--accent', col);
+    tempThumb.style.fill=col;
+    tempThumb.style.filter='drop-shadow(0 0 9px '+col+')';
+    document.querySelector('.ambient-main').style.background=
+      'radial-gradient(circle at 24% 18%, '+col+'ee 0, '+col+'77 18%, transparent 42%),'+
+      'radial-gradient(circle at 50% 45%, rgba(255,245,232,.24) 0, rgba(255,245,232,0) 52%)';
+  }
+
+  var pending1=null, inFlight1=false;
+  function sendMainNow(bright,tone){
+    inFlight1=true;
+    var url='/set?bright='+Math.round(bright)+'&tone='+Math.round(tone)+'&_='+Date.now();
+    fetch(url,{cache:'no-store'})
+      .catch(function(){})
       .then(function(){
-        inFlight1 = false;
-        if (pending1 != null) {
-          var x = pending1; pending1 = null;
-          sendMainNow(x.b, x.t);
-        }
+        inFlight1=false;
+        if(pending1!=null){ var x=pending1; pending1=null; sendMainNow(x.b,x.t); }
       });
   }
-
-  function queueMain(bright, tone) {
-    pending1 = { b: bright, t: tone };
-    if (!inFlight1) {
-      var x = pending1; pending1 = null;
-      sendMainNow(x.b, x.t);
-    }
+  function queueMain(bright,tone){
+    pending1={b:bright,t:tone};
+    if(!inFlight1){ var x=pending1; pending1=null; sendMainNow(x.b,x.t); }
   }
 
-  tg1.addEventListener('click', function() {
-    if (isOn1()) {
-      lastB1 = b1;
-      localStorage.setItem('p1_lastBright', String(b1));
-      b1 = 0;
+  var dragging=false, activePointerId=null;
+  function isOnThumb(e){
+    var r=dialMain.getBoundingClientRect();
+    var p=point(START+SPAN*b1/100);
+    var tx=r.left+(p.x/240)*r.width;
+    var ty=r.top+(p.y/240)*r.height;
+    var tol=e.pointerType==='touch'?25:15;
+    return Math.hypot(e.clientX-tx,e.clientY-ty)<=tol;
+  }
+  function pointerToValue(e){
+    var r=dialMain.getBoundingClientRect();
+    var x=(e.clientX-r.left)/r.width*240-CENTER;
+    var y=(e.clientY-r.top)/r.height*240-CENTER;
+    var angle=(Math.atan2(x,-y)*180/Math.PI+360)%360;
+    var delta=(angle-START+360)%360;
+    if(delta>SPAN) return ((360-delta)<(delta-SPAN))?0:100;
+    return clamp(Math.round(delta/SPAN*100),0,100);
+  }
+  dialMain.addEventListener('pointerdown', function(e){
+    if(b1<=0||dragging||!isOnThumb(e)) return;
+    e.preventDefault(); dragging=true; activePointerId=e.pointerId;
+    dialMain.setPointerCapture(e.pointerId);
+  });
+  dialMain.addEventListener('pointermove', function(e){
+    if(!dragging||e.pointerId!==activePointerId) return;
+    e.preventDefault();
+    b1=pointerToValue(e);
+    if(b1>0){ lastB1=b1; localStorage.setItem('p1_lastBright',String(b1)); }
+    localStorage.setItem('p1_bright',String(b1));
+    renderMain(); queueMain(b1,t1);
+  });
+  function stopMainDrag(e){
+    if(e.pointerId!==activePointerId) return;
+    dragging=false; activePointerId=null;
+    if(dialMain.hasPointerCapture(e.pointerId)) dialMain.releasePointerCapture(e.pointerId);
+  }
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(t){
+    dialMain.addEventListener(t, stopMainDrag);
+  });
+  dialMain.addEventListener('keydown', function(e){
+    if(b1<=0) return;
+    var next=b1, handled=true;
+    switch(e.key){
+      case 'ArrowUp': case 'ArrowRight': next+=1; break;
+      case 'ArrowDown': case 'ArrowLeft': next-=1; break;
+      case 'PageUp': next+=10; break;
+      case 'PageDown': next-=10; break;
+      case 'Home': next=0; break;
+      case 'End': next=100; break;
+      default: handled=false;
+    }
+    if(!handled) return;
+    e.preventDefault();
+    b1=clamp(next,0,100);
+    if(b1>0){ lastB1=b1; localStorage.setItem('p1_lastBright',String(b1)); }
+    localStorage.setItem('p1_bright',String(b1));
+    renderMain(); queueMain(b1,t1);
+  });
+
+  var tempDragging=false, tempPointerId=null;
+  function isOnTempThumb(e){
+    var r=tempHit.getBoundingClientRect();
+    var norm=(clamp(tempK,TEMP_MIN,TEMP_MAX)-TEMP_MIN)/(TEMP_MAX-TEMP_MIN);
+    var p=tempPoint(TEMP_START+TEMP_SPAN*norm);
+    var tx=r.left+(p.x/240)*r.width;
+    var ty=r.top+(p.y/240)*r.height;
+    var tol=e.pointerType==='touch'?24:14;
+    return Math.hypot(e.clientX-tx,e.clientY-ty)<=tol;
+  }
+  function tempPointerToKelvin(e){
+    var r=tempHit.getBoundingClientRect();
+    var x=(e.clientX-r.left)/r.width*240-TEMP_CX;
+    var y=(e.clientY-r.top)/r.height*240-TEMP_CY;
+    var angle=(Math.atan2(x,-y)*180/Math.PI+360)%360;
+    var ext=angle<180?angle+360:angle;
+    ext=clamp(ext,TEMP_START,TEMP_START+TEMP_SPAN);
+    var norm=(ext-TEMP_START)/TEMP_SPAN;
+    return Math.round((TEMP_MIN+norm*(TEMP_MAX-TEMP_MIN))/100)*100;
+  }
+  tempHit.addEventListener('pointerdown', function(e){
+    if(b1<=0||tempDragging||!isOnTempThumb(e)) return;
+    e.preventDefault(); tempDragging=true; tempPointerId=e.pointerId;
+    tempHit.setPointerCapture(e.pointerId);
+  });
+  tempHit.addEventListener('pointermove', function(e){
+    if(!tempDragging||e.pointerId!==tempPointerId) return;
+    e.preventDefault();
+    tempK=clamp(tempPointerToKelvin(e),TEMP_MIN,TEMP_MAX);
+    t1=kelvinToTone(tempK);
+    localStorage.setItem('p1_tone',String(t1));
+    renderMain(); queueMain(b1,t1);
+  });
+  function stopTempDrag(e){
+    if(e.pointerId!==tempPointerId) return;
+    tempDragging=false; tempPointerId=null;
+    if(tempHit.hasPointerCapture(e.pointerId)) tempHit.releasePointerCapture(e.pointerId);
+  }
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(t){
+    tempHit.addEventListener(t, stopTempDrag);
+  });
+  tempHit.addEventListener('keydown', function(e){
+    if(b1<=0) return;
+    var next=tempK, handled=true;
+    switch(e.key){
+      case 'ArrowLeft': case 'ArrowDown': next-=100; break;
+      case 'ArrowRight': case 'ArrowUp': next+=100; break;
+      case 'Home': next=TEMP_MIN; break;
+      case 'End': next=TEMP_MAX; break;
+      default: handled=false;
+    }
+    if(!handled) return;
+    e.preventDefault();
+    tempK=clamp(next,TEMP_MIN,TEMP_MAX);
+    t1=kelvinToTone(tempK);
+    localStorage.setItem('p1_tone',String(t1));
+    renderMain(); queueMain(b1,t1);
+  });
+
+  toggleMain.addEventListener('click', function(){
+    if(b1>0){
+      lastB1=b1;
+      localStorage.setItem('p1_lastBright',String(b1));
+      b1=0;
     } else {
-      b1 = lastB1 || 70;
+      b1=lastB1||70;
     }
-    br1.value = b1;
-    localStorage.setItem('p1_bright', String(b1));
-    visual1();
-    queueMain(b1, t1);
+    localStorage.setItem('p1_bright',String(b1));
+    renderMain(); queueMain(b1,t1);
   });
 
-  br1.addEventListener('input', function() {
-    b1 = parseInt(br1.value, 10);
-    if (b1 > 0) { lastB1 = b1; localStorage.setItem('p1_lastBright', String(b1)); }
-    localStorage.setItem('p1_bright', String(b1));
-    visual1();
-    queueMain(b1, t1);
-  });
-  br1.addEventListener('change', function() {
-    b1 = parseInt(br1.value, 10);
-    if (b1 > 0) { lastB1 = b1; localStorage.setItem('p1_lastBright', String(b1)); }
-    localStorage.setItem('p1_bright', String(b1));
-    visual1();
-    queueMain(b1, t1);
-  });
-  tn1.addEventListener('input', function() {
-    t1 = parseInt(tn1.value, 10);
-    localStorage.setItem('p1_tone', String(t1));
-    queueMain(b1, t1);
-  });
-  tn1.addEventListener('change', function() {
-    t1 = parseInt(tn1.value, 10);
-    localStorage.setItem('p1_tone', String(t1));
-    queueMain(b1, t1);
-  });
+  var cardAcc=document.querySelector('.card[data-name="accent"]');
+  var dialAcc=cardAcc.querySelector('.dial');
+  var trackAcc=dialAcc.querySelector('.track');
+  var progAcc=dialAcc.querySelector('.progress');
+  var thumbAcc=dialAcc.querySelector('.thumb');
+  var valAcc=cardAcc.querySelector('.value');
+  var statValAcc=cardAcc.querySelector('.status-value');
+  var statTxtAcc=cardAcc.querySelector('.status-text');
+  var toggleAcc=cardAcc.querySelector('.toggle');
 
-  // ===================== СПАЛЬНЯ =====================
-  var EXECUTOR = 'http://192.168.1.51';
+  trackAcc.setAttribute('d', arcPath(START, START+SPAN));
 
-  var tg2  = document.getElementById('lightToggle2');
-  var br2  = document.getElementById('brightness2');
-  var dot2 = document.getElementById('connDot2');
+  var cur2=parseInt(localStorage.getItem('exec_brightness')||'70',10);
+  if(isNaN(cur2)||cur2<0||cur2>100) cur2=70;
+  var lastNonZero2=cur2>0?cur2:70;
 
-  var cur2     = parseInt(localStorage.getItem('exec_brightness') || '70', 10);
-  if (isNaN(cur2) || cur2 < 0 || cur2 > 100) cur2 = 70;
-  var lastNonZero2 = cur2 > 0 ? cur2 : 70;
+  function renderAcc(){
+    var on=cur2>0;
+    cardAcc.classList.toggle('off', !on);
+    toggleAcc.classList.toggle('on', on);
+    toggleAcc.setAttribute('aria-pressed', on?'true':'false');
+    statTxtAcc.textContent = on?'Вкл':'Выкл';
 
-  br2.value = cur2;
+    var angle=START+SPAN*cur2/100;
+    var p=point(angle);
+    progAcc.setAttribute('d', cur2===0 ? 'M '+point(START).x+' '+point(START).y : arcPath(START,angle));
+    thumbAcc.setAttribute('cx',p.x); thumbAcc.setAttribute('cy',p.y);
+    valAcc.innerHTML=cur2+'<span>%</span>';
+    statValAcc.textContent=cur2+'%';
+    dialAcc.setAttribute('aria-valuenow', String(cur2));
 
-  function visual2() {
-    var on = cur2 > 0;
-    tg2.classList.toggle('is-lit', on);
-    tg2.setAttribute('aria-pressed', on ? 'true' : 'false');
+    var level=(on?cur2:0)/100;
+    document.body.style.setProperty('--accent-level', String(Math.max(.04,level)));
   }
 
-  var pending2  = null;
-  var inFlight2 = false;
-
-  function sendExecNow(percent) {
-    inFlight2 = true;
-    var v = Math.max(0, Math.min(100, Math.round(percent)));
-    var url = EXECUTOR + '/set?val=' + v + '&_=' + Date.now();
-    fetch(url, { cache: 'no-store' })
-      .then(function(){ setDot(dot2, true); })
-      .catch(function(){ setDot(dot2, false); })
+  var pending2=null, inFlight2=false;
+  function sendAccNow(percent){
+    inFlight2=true;
+    var v=clamp(Math.round(percent),0,100);
+    var url=EXECUTOR+'/set?val='+v+'&_='+Date.now();
+    fetch(url,{cache:'no-store'})
+      .catch(function(){})
       .then(function(){
-        inFlight2 = false;
-        if (pending2 != null) {
-          var x = pending2; pending2 = null;
-          sendExecNow(x);
-        }
+        inFlight2=false;
+        if(pending2!=null){ var x=pending2; pending2=null; sendAccNow(x); }
       });
   }
+  function queueAcc(v){
+    pending2=v;
+    if(!inFlight2){ var x=pending2; pending2=null; sendAccNow(x); }
+  }
 
-  function queueExec(v) {
-    pending2 = v;
-    if (!inFlight2) {
-      var x = pending2; pending2 = null;
-      sendExecNow(x);
+  var dragging2=false, activePointerId2=null;
+  function isOnThumb2(e){
+    var r=dialAcc.getBoundingClientRect();
+    var p=point(START+SPAN*cur2/100);
+    var tx=r.left+(p.x/240)*r.width;
+    var ty=r.top+(p.y/240)*r.height;
+    var tol=e.pointerType==='touch'?25:15;
+    return Math.hypot(e.clientX-tx,e.clientY-ty)<=tol;
+  }
+  function pointerToValue2(e){
+    var r=dialAcc.getBoundingClientRect();
+    var x=(e.clientX-r.left)/r.width*240-CENTER;
+    var y=(e.clientY-r.top)/r.height*240-CENTER;
+    var angle=(Math.atan2(x,-y)*180/Math.PI+360)%360;
+    var delta=(angle-START+360)%360;
+    if(delta>SPAN) return ((360-delta)<(delta-SPAN))?0:100;
+    return clamp(Math.round(delta/SPAN*100),0,100);
+  }
+  dialAcc.addEventListener('pointerdown', function(e){
+    if(cur2<=0||dragging2||!isOnThumb2(e)) return;
+    e.preventDefault(); dragging2=true; activePointerId2=e.pointerId;
+    dialAcc.setPointerCapture(e.pointerId);
+  });
+  dialAcc.addEventListener('pointermove', function(e){
+    if(!dragging2||e.pointerId!==activePointerId2) return;
+    e.preventDefault();
+    cur2=pointerToValue2(e);
+    if(cur2>0) lastNonZero2=cur2;
+    localStorage.setItem('exec_brightness',String(cur2));
+    renderAcc(); queueAcc(cur2);
+  });
+  function stopAccDrag(e){
+    if(e.pointerId!==activePointerId2) return;
+    dragging2=false; activePointerId2=null;
+    if(dialAcc.hasPointerCapture(e.pointerId)) dialAcc.releasePointerCapture(e.pointerId);
+  }
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(t){
+    dialAcc.addEventListener(t, stopAccDrag);
+  });
+  dialAcc.addEventListener('keydown', function(e){
+    if(cur2<=0) return;
+    var next=cur2, handled=true;
+    switch(e.key){
+      case 'ArrowUp': case 'ArrowRight': next+=1; break;
+      case 'ArrowDown': case 'ArrowLeft': next-=1; break;
+      case 'PageUp': next+=10; break;
+      case 'PageDown': next-=10; break;
+      case 'Home': next=0; break;
+      case 'End': next=100; break;
+      default: handled=false;
     }
-  }
-
-  br2.addEventListener('input', function() {
-    cur2 = parseInt(br2.value, 10);
-    if (cur2 > 0) lastNonZero2 = cur2;
-    visual2();
-    queueExec(cur2);
-  });
-  br2.addEventListener('change', function() {
-    cur2 = parseInt(br2.value, 10);
-    if (cur2 > 0) lastNonZero2 = cur2;
-    localStorage.setItem('exec_brightness', String(cur2));
-    visual2();
-    queueExec(cur2);
-  });
-  tg2.addEventListener('click', function() {
-    if (cur2 > 0) { lastNonZero2 = cur2; cur2 = 0; }
-    else { cur2 = lastNonZero2 || 70; }
-    br2.value = cur2;
-    localStorage.setItem('exec_brightness', String(cur2));
-    visual2();
-    queueExec(cur2);
+    if(!handled) return;
+    e.preventDefault();
+    cur2=clamp(next,0,100);
+    if(cur2>0) lastNonZero2=cur2;
+    localStorage.setItem('exec_brightness',String(cur2));
+    renderAcc(); queueAcc(cur2);
   });
 
-  // ===================== СИНХРОНИЗАЦИЯ =====================
-  function syncMain() {
-    fetch('/status?_=' + Date.now(), { cache: 'no-store' })
+  toggleAcc.addEventListener('click', function(){
+    if(cur2>0){ lastNonZero2=cur2; cur2=0; }
+    else { cur2=lastNonZero2||70; }
+    localStorage.setItem('exec_brightness',String(cur2));
+    renderAcc(); queueAcc(cur2);
+  });
+
+  function syncMain(){
+    fetch('/status?_='+Date.now(),{cache:'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (typeof d.bright === 'number') {
-          b1 = Math.max(0, Math.min(100, d.bright));
-          br1.value = b1;
+        if(typeof d.bright==='number') b1=clamp(d.bright,0,100);
+        if(typeof d.tone==='number'){
+          t1=clamp(d.tone,0,100);
+          tempK=toneToKelvin(t1);
         }
-        if (typeof d.tone === 'number') {
-          t1 = Math.max(0, Math.min(100, d.tone));
-          tn1.value = t1;
-        }
-        localStorage.setItem('p1_bright', String(b1));
-        localStorage.setItem('p1_tone',   String(t1));
-        if (b1 > 0) { lastB1 = b1; localStorage.setItem('p1_lastBright', String(b1)); }
-        visual1();
-        setDot(dot1, true);
+        localStorage.setItem('p1_bright',String(b1));
+        localStorage.setItem('p1_tone',String(t1));
+        if(b1>0){ lastB1=b1; localStorage.setItem('p1_lastBright',String(b1)); }
+        renderMain();
       })
-      .catch(function(){ setDot(dot1, false); });
+      .catch(function(){});
   }
-
-  function syncExec() {
-    fetch(EXECUTOR + '/status?_=' + Date.now(), { cache: 'no-store' })
+  function syncAcc(){
+    fetch(EXECUTOR+'/status?_='+Date.now(),{cache:'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (typeof d.val === 'number') {
-          cur2 = Math.max(0, Math.min(100, d.val));
-          br2.value = cur2;
-        }
-        localStorage.setItem('exec_brightness', String(cur2));
-        if (cur2 > 0) lastNonZero2 = cur2;
-        visual2();
-        setDot(dot2, true);
+        if(typeof d.val==='number') cur2=clamp(d.val,0,100);
+        localStorage.setItem('exec_brightness',String(cur2));
+        if(cur2>0) lastNonZero2=cur2;
+        renderAcc();
       })
-      .catch(function(){ setDot(dot2, false); });
+      .catch(function(){});
   }
 
-  visual1();
-  visual2();
+  renderMain();
+  renderAcc();
   syncMain();
-  syncExec();
-
-  console.log('[PULT] ===== ГОТОВ =====');
+  syncAcc();
+  setInterval(function(){ syncMain(); syncAcc(); }, 30000);
 })();
 </script>
 </body>
@@ -709,13 +950,12 @@ void setup() {
   server.on("/",              handleRoot);
   server.on("/set",           handleSet);
   server.on("/status",        handleStatus);
-  server.on("/icon.svg",      handleIcon);
+  server.on("/icon2.svg",     handleIcon); // Изменен путь на icon2.svg
   server.on("/manifest.json", handleManifest);
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("[HTTP] Server started");
 
-  // WiFi
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
